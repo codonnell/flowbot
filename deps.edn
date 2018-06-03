@@ -20,7 +20,9 @@
  {:dev
   {:extra-paths ["dev" "test"]
    :extra-deps
-   {integrant/repl {:mvn/version "0.3.0"}}}
+   {integrant/repl    {:mvn/version "0.3.0"}
+    cider/cider-nrepl {:mvn/version "0.18.0-SNAPSHOT"}
+    refactor-nrepl    {:mvn/version "2.3.1"}}}
 
   :test
   {:extra-paths ["test"]
