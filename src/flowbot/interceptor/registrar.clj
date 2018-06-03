@@ -60,14 +60,19 @@
                                                                       :name name}))
       (registry_ name))))
 
-;; Automatically convert keywords to interceptors by attempting to get them from the registry
 (extend-protocol int/IntoInterceptor
-  clojure.lang.Keyword
-  (-interceptor [t] (get registry t))
-
   ;; Our input is under :event and output is under :effects instead of :request
-  ;; and :response, so we overwrite the default
+  ;; and :response, so we override the default
   clojure.lang.Fn
   (-interceptor [t]
     (int/interceptor {:enter (fn [context]
                                (assoc context :effects (t (:event context))))})))
+
+(defn interceptor
+  "If int is a keyword, gets its value from the registrar. Otherwise attempts to
+  coerce int to an interceptor. Throws if int is not found by the registrar or
+  the value cannot be coerced to an interceptor."
+  [registrar int]
+  (if (keyword? int)
+    (get registrar int)
+    (int/interceptor int)))
