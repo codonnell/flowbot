@@ -2,7 +2,7 @@
  :deps
  {org.clojure/clojure              {:mvn/version "1.10.0-alpha4"}
   manifold                         {:mvn/version "0.1.6"}
-  discord.clj                      {:mvn/version "1.0.0"}
+  discord.clj                      {:mvn/version "1.1.0"}
   integrant                        {:mvn/version "0.7.0-alpha2"}
   com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
   clojure.java-time                {:mvn/version "0.3.1"}
