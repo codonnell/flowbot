@@ -2,6 +2,7 @@
   (:require [flowbot.config :as config]
             [integrant.repl :as ig.repl :refer [clear go halt prep init reset reset-all]]
             ;; for integrant multimethods
-            flowbot.data.postgres))
+            flowbot.data.postgres
+            flowbot.discord.bot))
 
 (ig.repl/set-prep! config/system)

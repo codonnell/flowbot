@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 repl:
-	source flowbot.env && clj -A:dev
+	source flowbot.env && source flowbot_secret.env && clj -A:dev
 
 test:
 	clojure -A\:test
@@ -16,12 +16,12 @@ outdated:
 	clojure -Aoutdated -a outdated
 
 serve-jar:
-	source flowbot.env && java -jar flowbot.jar -m flowbot.service
+	source flowbot.env && source flowbot_secret.env && java -jar flowbot.jar -m flowbot.service
 
 migrate:
-	source flowbot.env && clojure -m flowbot.migrate.up
+	source flowbot.env && source flowbot_secret.env && clojure -m flowbot.migrate.up
 
 rollback:
-	source flowbot.env && clojure -m flowbot.migrate.down
+	source flowbot.env && source flowbot_secret.env && clojure -m flowbot.migrate.down
 
 pack: clean uberjar

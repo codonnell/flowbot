@@ -4,4 +4,10 @@
   :host #dyn/prop DB_HOST
   :port #dyn/prop DB_PORT
   :user #dyn/prop DB_USER
-  :password #dyn/prop DB_PASS}}
+  :password #dyn/prop DB_PASS}
+
+ :discord/bot
+ {:token #dyn/prop FLOWBOT_TOKEN
+  :name #dyn/prop [FLOWBOT_NAME "flowbot"]
+  :prefix #dyn/prop [FLOWBOT_PREFIX "!"]
+  :owner-id #dyn/prop FLOWBOT_OWNER_ID}}

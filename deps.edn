@@ -1,19 +1,20 @@
 {:paths ["src" "resources"]
  :deps
- {org.clojure/clojure            {:mvn/version "1.10.0-alpha4"}
-  manifold                       {:mvn/version "0.1.6"}
-  discord.clj                    {:mvn/version "1.0.0"}
-  integrant                      {:mvn/version "0.7.0-alpha2"}
-  com.walmartlabs/dyn-edn        {:mvn/version "0.2.0"}
-  clojure.java-time              {:mvn/version "0.3.1"}
-  org.postgresql/postgresql      {:mvn/version "42.2.2"}
-  com.layerware/hugsql           {:mvn/version "0.4.8"}
-  com.mchange/c3p0               {:mvn/version "0.9.5.2"}
-  ragtime                        {:mvn/version "0.7.2"}
-  cheshire                       {:mvn/version "5.8.0"}
-  camel-snake-kebab              {:mvn/version "0.4.0"}
-  org.clojure/tools.logging      {:mvn/version "0.4.0"}
-  ch.qos.logback/logback-classic {:mvn/version "1.2.3"}}
+ {org.clojure/clojure              {:mvn/version "1.10.0-alpha4"}
+  manifold                         {:mvn/version "0.1.6"}
+  discord.clj                      {:mvn/version "1.0.0"}
+  integrant                        {:mvn/version "0.7.0-alpha2"}
+  com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
+  clojure.java-time                {:mvn/version "0.3.1"}
+  org.postgresql/postgresql        {:mvn/version "42.2.2"}
+  com.layerware/hugsql             {:mvn/version "0.4.8"}
+  com.mchange/c3p0                 {:mvn/version "0.9.5.2"}
+  ragtime                          {:mvn/version "0.7.2"}
+  cheshire                         {:mvn/version "5.8.0"}
+  camel-snake-kebab                {:mvn/version "0.4.0"}
+  org.clojure/tools.logging        {:mvn/version "0.4.0"}
+  ch.qos.logback/logback-classic   {:mvn/version "1.2.3"}
+  io.pedestal/pedestal.interceptor {:mvn/version "0.5.3"}}
 
  :aliases
  {:dev
