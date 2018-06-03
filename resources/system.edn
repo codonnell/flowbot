@@ -1,0 +1,7 @@
+{:postgres/connection
+ {:dbtype "postgresql"
+  :dbname #dyn/prop DB_NAME
+  :host #dyn/prop DB_HOST
+  :port #dyn/prop DB_PORT
+  :user #dyn/prop DB_USER
+  :password #dyn/prop DB_PASS}}

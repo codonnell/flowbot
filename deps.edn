@@ -1,0 +1,43 @@
+{:paths ["src" "resources"]
+ :deps
+ {org.clojure/clojure            {:mvn/version "1.10.0-alpha4"}
+  manifold                       {:mvn/version "0.1.6"}
+  discord.clj                    {:mvn/version "1.0.0"}
+  integrant                      {:mvn/version "0.7.0-alpha2"}
+  com.walmartlabs/dyn-edn        {:mvn/version "0.2.0"}
+  clojure.java-time              {:mvn/version "0.3.1"}
+  org.postgresql/postgresql      {:mvn/version "42.2.2"}
+  com.layerware/hugsql           {:mvn/version "0.4.8"}
+  com.mchange/c3p0               {:mvn/version "0.9.5.2"}
+  ragtime                        {:mvn/version "0.7.2"}
+  cheshire                       {:mvn/version "5.8.0"}
+  camel-snake-kebab              {:mvn/version "0.4.0"}
+  org.clojure/tools.logging      {:mvn/version "0.4.0"}
+  ch.qos.logback/logback-classic {:mvn/version "1.2.3"}}
+
+ :aliases
+ {:dev
+  {:extra-paths ["dev" "test"]
+   :extra-deps
+   {integrant/repl {:mvn/version "0.3.0"}}}
+
+  :test
+  {:extra-paths ["test"]
+   :extra-deps
+   {com.cognitect/test-runner
+    {:git/url "git@github.com:cognitect-labs/test-runner"
+     :sha     "5fb4fc46ad0bf2e0ce45eba5b9117a2e89166479"}}
+   :main-opts   ["-m" "cognitect.test-runner"]}
+
+  :outdated
+  {:extra-deps {olical/depot {:mvn/version "1.1.0"}}
+   :main-opts  ["-m" "depot.outdated.main"]}
+
+  ;; TODO: Fix this up when needed
+  ;; :uberjar
+  ;; {:extra-deps
+  ;;  {pack/pack.alpha
+  ;;   {:git/url "git@github.com:juxt/pack.alpha.git"
+  ;;    :sha     "bb2c5a2c78aca9328e023b029c06ba0efdd1e3b7"}}
+  ;;  :main-opts ["-m" "mach.pack.alpha.jcl" "deps.edn" "flowbot.jar" "resources"]}
+  }}
