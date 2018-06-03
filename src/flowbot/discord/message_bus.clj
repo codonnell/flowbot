@@ -11,7 +11,7 @@
         (let [command (-> content
                           (str/split #"\s")
                           first
-                          (substr (count prefix))
+                          (subs (count prefix))
                           keyword)]
           (bus/publish! bus command message)))
       (bus/publish! bus ::all message))
