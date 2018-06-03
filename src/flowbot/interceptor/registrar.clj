@@ -59,3 +59,15 @@
       (throw (ex-info "An interceptor with that name does not exist" {:registry registry_
                                                                       :name name}))
       (registry_ name))))
+
+;; Automatically convert keywords to interceptors by attempting to get them from the registry
+(extend-protocol int/IntoInterceptor
+  clojure.lang.Keyword
+  (-interceptor [t] (get registry t))
+
+  ;; Our input is under :event and output is under :effects instead of :request
+  ;; and :response, so we overwrite the default
+  clojure.lang.Fn
+  (-interceptor [t]
+    (int/interceptor {:enter (fn [context]
+                               (assoc context :effects (t (:event context))))})))
