@@ -14,6 +14,8 @@ Create a postgres user with name `flowbot` and password `flowbot` and database `
 
 Next, to apply database migrations, you can run `make migrate`. (And you can run `make rollback` to revert the latest migration.)
 
+To start a repl, run `make repl`.
+
 ## Usage
 
 FIXME: explanation

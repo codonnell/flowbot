@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
-serve:
-	source flowbot.env && clojure -m flowbot.service
+repl:
+	source flowbot.env && clj -A:dev
 
 test:
 	clojure -A\:test
