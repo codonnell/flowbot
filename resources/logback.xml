@@ -1,0 +1,16 @@
+<configuration scan="true" scanPeriod="10 seconds">
+
+  <logger name="ch.qos.logback" level="ERROR"/>
+
+  <logger name="flowbot" level="INFO"/>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>
