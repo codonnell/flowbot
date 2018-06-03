@@ -16,4 +16,7 @@
  {:bot #ig/ref :discord/bot}
 
  :interceptor/registrar
+ {}
+
+ :effect/registrar
  {}}
