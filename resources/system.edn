@@ -4,7 +4,11 @@
   :host #dyn/prop DB_HOST
   :port #dyn/prop DB_PORT
   :user #dyn/prop DB_USER
-  :password #dyn/prop DB_PASS}
+  :password #dyn/prop DB_PASS
+  :registrar #ig/ref :registrar}
+
+ :event-bus
+ {}
 
  :discord/bot
  {:token #dyn/prop FLOWBOT_TOKEN
@@ -12,11 +16,17 @@
   :prefix #dyn/prop [FLOWBOT_PREFIX "!"]
   :owner-id #dyn/prop FLOWBOT_OWNER_ID}
 
- :discord/message-bus
- {:bot #ig/ref :discord/bot}
+ :discord/message-dispatcher
+ {:bot #ig/ref :discord/bot
+  :event-bus #ig/ref :event-bus}
 
- :interceptor/registrar
- {}
+ :registrar
+ {:postgres #ig/ref :postgres/connection}
 
- :effect/registrar
- {}}
+ :discord/registrar
+ {:registrar #ig/ref :registrar
+  :bot #ig/ref :discord/bot}
+
+ :command/handler
+ {:registrar #ig/ref :registrar
+  :event-bus #ig/ref :event-bus}}
