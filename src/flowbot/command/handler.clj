@@ -13,18 +13,17 @@
             :handler-fn (fn [message]
                           {::discord.action/reply {:content "Hello!"}})}}})
 
-(defn- dispatcher [registrar]
-  (fn [{name :command :as message}]
-    (let [command (reg/get registrar :command name)
-          handler (event.handler/handler registrar command)]
-      (event.handler/execute registrar handler message))))
+(defn- execute-command [{name :command :as message}]
+  (let [command (reg/get :command name)
+        handler (event.handler/handler command)]
+    (event.handler/execute handler message)))
 
-(defmethod ig/init-key :command/handler [_ {:keys [registrar event-bus]}]
-  (let [event-stream (bus/subscribe event-bus :command)]
-    (reg/add-registry! registrar registry)
-    (stream/consume (dispatcher registrar) event-stream)
-    {:registrar registrar :event-stream event-stream :registry registry}))
+(defmethod ig/init-key :command/handler [_ {:keys [event-bus]}]
+  (let [command-stream (bus/subscribe event-bus :command)]
+    (reg/add-registry! registry)
+    (stream/consume execute-command command-stream)
+    {:command-stream command-stream :registry registry}))
 
-(defmethod ig/halt-key! :command/handler [_ {:keys [registrar event-stream registry]}]
-  (reg/remove-registry! registrar registry)
-  (stream/close! event-stream))
+(defmethod ig/halt-key! :command/handler [_ {:keys [command-stream registry]}]
+  (reg/remove-registry! registry)
+  (stream/close! command-stream))

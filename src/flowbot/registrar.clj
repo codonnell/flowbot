@@ -1,5 +1,8 @@
 (ns flowbot.registrar
+  (:require [clojure.tools.logging :as log])
   (:refer-clojure :exclude [get]))
+
+(def registry (atom {}))
 
 (defmulti valid-entity?
   "Validation function that can be run by implementers of IRegistrar. Always
@@ -14,16 +17,43 @@
 
 (defmethod coerce-entity :default [_ ent] ent)
 
-(defprotocol IRegistrar
-  (register! [this ent-type name ent]
-    "Registers an entity of type ent-type. Throws an exception if an entity with
-    that type and name already exists or the entity is invalid.")
-  (unregister! [this ent-type name]
-    "Unregisters the entity with the given type and name. Throws an exception if
-    such an entity does not exist.")
-  (get [this ent-type name]
-    "Returns the entity with the given type and name. Throws an exception if
-    such an entity does not exist."))
+(defn- register [registry ent-type name ent]
+  (log/info "Registering entity" {:ent-type ent-type :name name :ent ent})
+  (cond (contains? (registry ent-type) name)
+        (throw (ex-info "An entity with that type and name already exists. Unregister it and try again."
+                        {:registry registry
+                         :ent-type ent-type
+                         :name name
+                         :ent ent}))
+
+        (not (valid-entity? ent-type ent))
+        (throw (ex-info "That entity is invalid."
+                        {:ent-type ent-type
+                         :name name
+                         :ent ent}))
+
+        :else
+        (assoc-in registry [ent-type name] (coerce-entity ent-type ent))))
+
+(defn register! [ent-type name ent]
+  (swap! registry register ent-type name ent))
+
+(defn- unregister [registry ent-type name]
+  (if-not (contains? (registry ent-type) name)
+    (throw (ex-info "There is no entity registered with that type and name."
+                    {:ent-type ent-type
+                     :name name}))
+    (update registry ent-type dissoc name)))
+
+(defn unregister! [ent-type name]
+  (swap! registry unregister ent-type name))
+
+(defn get [ent-type name]
+  (if-some [ent (get-in @registry [ent-type name])]
+    ent
+    (throw (ex-info "There is no entity registered with that type and name."
+                    {:ent-type ent-type
+                     :name name}))))
 
 (defn add-registry!
   "Given a map `registry` of the shape
@@ -31,11 +61,11 @@
   {:ent-type-a {:enta1 enta1 :enta2 enta2}
    :ent-type-b {:entb1 entb1 :entb2 entb2}}
   ```
-  adds each contained entity using the `registrar` component."
-  [registrar registry]
+  registers each contained entity."
+  [registry]
   (doseq [[ent-type ent-registry] registry
           [name ent] ent-registry]
-    (register! registrar ent-type name ent)))
+    (register! ent-type name ent)))
 
 (defn remove-registry!
   "Given a map `registry` of the shape
@@ -43,8 +73,8 @@
   {:ent-type-a {:enta1 enta1 :enta2 enta2}
    :ent-type-b {:entb1 entb1 :entb2 entb2}}
   ```
-  removes each contained entity using the `registrar` component."
-  [registrar registry]
+  unregisters each contained entity."
+  [registry]
   (doseq [[ent-type ent-registry] registry
           [name ent] ent-registry]
-    (unregister! registrar ent-type name)))
+    (unregister! ent-type name)))

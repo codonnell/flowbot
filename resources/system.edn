@@ -4,8 +4,7 @@
   :host #dyn/prop DB_HOST
   :port #dyn/prop DB_PORT
   :user #dyn/prop DB_USER
-  :password #dyn/prop DB_PASS
-  :registrar #ig/ref :registrar}
+  :password #dyn/prop DB_PASS}
 
  :event-bus
  {}
@@ -20,13 +19,8 @@
  {:bot #ig/ref :discord/bot
   :event-bus #ig/ref :event-bus}
 
- :registrar
- {:postgres #ig/ref :postgres/connection}
-
  :discord/registrar
- {:registrar #ig/ref :registrar
-  :bot #ig/ref :discord/bot}
+ {:bot #ig/ref :discord/bot}
 
  :command/handler
- {:registrar #ig/ref :registrar
-  :event-bus #ig/ref :event-bus}}
+ {:event-bus #ig/ref :event-bus}}

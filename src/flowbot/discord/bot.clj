@@ -6,9 +6,7 @@
 
 (defmethod ig/init-key :discord/bot [_ {:keys [prefix token name]}]
   (let [bot (bot/create-bot name [] prefix (types/->SimpleAuth token))]
-    (bot/defhandler printer [prefix client message]
-      (log/info message))
-    (log/info {:bot bot})
+    (log/info "Started bot" {:bot bot})
     bot))
 
 (defmethod ig/halt-key! :discord/bot [_ bot]

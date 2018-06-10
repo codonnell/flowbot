@@ -7,9 +7,9 @@
 
 (defrecord Handler [interceptors handler-fn])
 
-(defn handler [registrar {:keys [interceptors handler-fn]}]
-  (->Handler (mapv (partial int.reg/interceptor registrar) interceptors)
-             (int.reg/interceptor registrar handler-fn)))
+(defn handler [{:keys [interceptors handler-fn]}]
+  (->Handler (mapv int.reg/interceptor interceptors)
+             (int.reg/interceptor handler-fn)))
 
 (defn valid-handler? [{:keys [interceptors handler-fn] :as handler}]
   (and (= Handler (type handler))
@@ -24,9 +24,9 @@
 
 (defn execute
   "Applies a handler to an event and executes the effects returned."
-  [registrar handler event]
+  [handler event]
   {:pre [(valid-handler? handler)]}
   (let [fx (event->effects handler event)]
     (doseq [[name params] fx]
-      (let [{:keys [f]} (reg/get registrar :effect name)]
+      (let [{:keys [f]} (reg/get :effect name)]
         (f params)))))

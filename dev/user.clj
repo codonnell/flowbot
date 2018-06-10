@@ -9,7 +9,6 @@
             flowbot.discord.bot
             flowbot.discord.registrar
             flowbot.discord.message-dispatcher
-            flowbot.registrar.registrar
             flowbot.command.handler))
 
 (ig.repl/set-prep! config/system)

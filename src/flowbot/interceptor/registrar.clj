@@ -17,7 +17,7 @@
     (int/interceptor {:enter (fn [context]
                                (assoc context :effects (t (:event context))))})))
 
-(defn interceptor [registrar ent]
+(defn interceptor [ent]
   (if (keyword? ent)
-    (reg/get registrar :interceptor ent)
+    (reg/get :interceptor ent)
     (int/interceptor ent)))
