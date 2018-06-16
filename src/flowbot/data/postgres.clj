@@ -1,5 +1,6 @@
 (ns flowbot.data.postgres
-  (:require [integrant.core :as ig]
+  (:require [flowbot.registrar :as reg]
+            [integrant.core :as ig]
             [cheshire.core :as json]
             hugsql.adapter
             hugsql.core
@@ -9,6 +10,16 @@
   (:import com.mchange.v2.c3p0.ComboPooledDataSource
            org.postgresql.util.PGobject))
 
+(def ^:private inject-int-name ::inject-conn)
+
+(defn inject-conn
+  "Given a database connection, returns an interceptor that injects the database
+  connection under the key :flowbot.data.postgres/conn."
+  [conn]
+  {:name inject-int-name
+   :before (fn [ctx]
+             (assoc ctx ::conn conn))})
+
 (defmethod ig/init-key :postgres/connection [_ {:keys [dbtype dbname host port user pass]}]
   (let [url (str "jdbc:" dbtype "://" host ":" port "/" dbname)
         pool {:datasource (doto (ComboPooledDataSource.)
@@ -16,9 +27,11 @@
                             (.setJdbcUrl url)
                             (.setUser user)
                             (.setPassword pass))}]
+    (reg/register! :interceptor inject-int-name (inject-conn pool))
     pool))
 
 (defmethod ig/halt-key! :rainbot/db [_ pool]
+  (reg/unregister! :interceptor inject-int-name)
   (.close (:datasource pool)))
 
 (defn value-to-json-pgobject [value]
