@@ -17,43 +17,40 @@
 
 (defmethod coerce-entity :default [_ ent] ent)
 
+(defn- get* [registry ent-type name]
+  (get-in registry [ent-type name]))
+
+(defn get [ent-type name]
+  (get* @registry ent-type name))
+
 (defn- register [registry ent-type name ent]
   (log/info "Registering entity" {:ent-type ent-type :name name :ent ent})
-  (cond (contains? (registry ent-type) name)
-        (throw (ex-info "An entity with that type and name already exists. Unregister it and try again."
-                        {:registry registry
-                         :ent-type ent-type
-                         :name name
-                         :ent ent}))
-
-        (not (valid-entity? ent-type ent))
-        (throw (ex-info "That entity is invalid."
-                        {:ent-type ent-type
-                         :name name
-                         :ent ent}))
-
-        :else
-        (assoc-in registry [ent-type name] (coerce-entity ent-type ent))))
+  (when (contains? (registry ent-type) name)
+    (log/warn "An entity with that type and name already exists. Overwriting it..."
+              {:old-ent (get-in registry ent-type name)
+               :ent-type ent-type
+               :name name
+               :ent ent}))
+  (if (valid-entity? ent-type ent)
+    (assoc-in registry [ent-type name] (coerce-entity ent-type ent))
+    (throw (ex-info "That entity is invalid."
+                    {:ent-type ent-type
+                     :name name
+                     :ent ent}))))
 
 (defn register! [ent-type name ent]
   (swap! registry register ent-type name ent))
 
 (defn- unregister [registry ent-type name]
-  (if-not (contains? (registry ent-type) name)
-    (throw (ex-info "There is no entity registered with that type and name."
-                    {:ent-type ent-type
-                     :name name}))
-    (update registry ent-type dissoc name)))
+  (log/info "Unregistering entity" {:ent-type ent-type :name name :ent (get* registry ent-type name)})
+  (when-not (contains? (registry ent-type) name)
+    (log/warn "There is no entity registered with that type and name."
+              {:ent-type ent-type
+               :name name}))
+  (update registry ent-type dissoc name))
 
 (defn unregister! [ent-type name]
   (swap! registry unregister ent-type name))
-
-(defn get [ent-type name]
-  (if-some [ent (get-in @registry [ent-type name])]
-    ent
-    (throw (ex-info "There is no entity registered with that type and name."
-                    {:ent-type ent-type
-                     :name name}))))
 
 (defn add-registry!
   "Given a map `registry` of the shape
