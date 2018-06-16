@@ -21,6 +21,6 @@ order by created_at
 -- :doc Retrieve all mafia-events for a channel ordered by created_at
 select e.id, e.mafia_game_id, e.payload, e.created_at
 from mafia_event e
-inner join mafia_game g
+join mafia_game g on g.id = e.mafia_game_id
 where g.channel_id = :channel-id
 order by e.created_at
