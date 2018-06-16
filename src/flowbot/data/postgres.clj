@@ -17,16 +17,16 @@
   connection under the key :flowbot.data.postgres/conn."
   [conn]
   {:name inject-int-name
-   :before (fn [ctx]
-             (assoc ctx ::conn conn))})
+   :enter (fn [ctx]
+            (assoc ctx ::conn conn))})
 
-(defmethod ig/init-key :postgres/connection [_ {:keys [dbtype dbname host port user pass]}]
+(defmethod ig/init-key :postgres/connection [_ {:keys [dbtype dbname host port user password]}]
   (let [url (str "jdbc:" dbtype "://" host ":" port "/" dbname)
         pool {:datasource (doto (ComboPooledDataSource.)
                             (.setDriverClass "org.postgresql.Driver")
                             (.setJdbcUrl url)
                             (.setUser user)
-                            (.setPassword pass))}]
+                            (.setPassword password))}]
     (reg/register! :interceptor inject-int-name (inject-conn pool))
     pool))
 
