@@ -54,7 +54,7 @@
   (->> (hugsql.adapter/result-many this result options)
        (mapv #(csk-extras/transform-keys memoized-kebab-keyword-ulate %))))
 
-(defmethod hugsql.core/hugsql-result-fn :1 [sym] 'rainbot.db/result-one-snake->kebab)
-(defmethod hugsql.core/hugsql-result-fn :one [sym] 'rainbot.db/result-one-snake->kebab)
-(defmethod hugsql.core/hugsql-result-fn :* [sym] 'rainbot.db/result-many-snake->kebab)
-(defmethod hugsql.core/hugsql-result-fn :many [sym] 'rainbot.db/result-many-snake->kebab)
+(defmethod hugsql.core/hugsql-result-fn :1 [sym] 'flowbot.data.postgres/result-one-snake->kebab)
+(defmethod hugsql.core/hugsql-result-fn :one [sym] 'flowbot.data.postgres/result-one-snake->kebab)
+(defmethod hugsql.core/hugsql-result-fn :* [sym] 'flowbot.data.postgres/result-many-snake->kebab)
+(defmethod hugsql.core/hugsql-result-fn :many [sym] 'flowbot.data.postgres/result-many-snake->kebab)
