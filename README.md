@@ -12,7 +12,7 @@ Some example environment variables are set in `flowbot.env` with a couple of lin
 
 First you'll need to install the [clojure command line tools](https://clojure.org/guides/getting_started) and [postgres](https://www.postgresql.org/download/) if they are not already installed. This has been tested with postgres 10.4.
 
-Create a postgres user with name `flowbot` and password `flowbot` and database `flowbot`. This can be done by running the command `sudo -u postgres ./scripts/setup.sh`. (This assumes the user postgres is a psql superuser, which is standard.) If you wish to use different development user, password, or database name, then you'll need to create them yourself and alter the environment variables accordingly in `flowbot_secret.env`.
+Create a postgres user with name `flowbot` and password `flowbot` and database `flowbot`. Add the `pgcrypto` extension to the newly created `flowbot` database. This can be done by running the command `sudo -u postgres ./scripts/setup.sh`. (This assumes the user postgres is a psql superuser, which is standard.) If you wish to use different development user, password, or database name, then you'll need to create them yourself and alter the environment variables accordingly in `flowbot_secret.env`.
 
 Next, to apply database migrations, you can run `make migrate`. (And you can run `make rollback` to revert the latest migration.)
 

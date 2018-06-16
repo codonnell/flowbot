@@ -1,5 +1,5 @@
 create table mafia_game (
-  id serial primary key,
+  id uuid primary key default gen_random_uuid(),
   channel_id bigint not null,
   moderator_id bigint not null,
   created_at timestamp not null default now(),

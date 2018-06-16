@@ -1,6 +1,6 @@
 create table mafia_event (
-  id serial primary key,
-  mafia_game_id int references mafia_game (id),
+  id uuid primary key default gen_random_uuid(),
+  mafia_game_id uuid references mafia_game (id),
   payload jsonb not null,
   created_at timestamp not null default now()
 );
