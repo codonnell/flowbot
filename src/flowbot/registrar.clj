@@ -27,7 +27,7 @@
   (log/info "Registering entity" {:ent-type ent-type :name name :ent ent})
   (when (contains? (registry ent-type) name)
     (log/warn "An entity with that type and name already exists. Overwriting it..."
-              {:old-ent (get-in registry ent-type name)
+              {:old-ent (get* registry ent-type name)
                :ent-type ent-type
                :name name
                :ent ent}))

@@ -1,10 +1,12 @@
 SHELL := /bin/bash
 
+.PHONY: test
+
 repl:
 	source flowbot.env && source flowbot_secret.env && clj -A:dev
 
 test:
-	clojure -A\:test
+	clj -A\:test
 
 clean:
 	rm -rf target flowbot.jar

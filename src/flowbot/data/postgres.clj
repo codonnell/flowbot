@@ -39,15 +39,15 @@
     (.setType "json")
     (.setValue (json/encode value))))
 
-(extend-protocol clojure.java.jdbc/ISQLParameter
-  clojure.lang.IPersistentVector
-  (set-parameter [v ^java.sql.PreparedStatement stmt ^long i]
-    (let [conn (.getConnection stmt)
-          meta (.getParameterMetaData stmt)
-          type-name (.getParameterTypeName meta i)]
-      (if-let [elem-type (when (= (first type-name) \_) (apply str (rest type-name)))]
-        (.setObject stmt i (.createArrayOf conn elem-type (to-array v)))
-        (.setObject stmt i v)))))
+#_(extend-protocol clojure.java.jdbc/ISQLParameter
+    clojure.lang.IPersistentVector
+    (set-parameter [v ^java.sql.PreparedStatement stmt ^long i]
+      (let [conn (.getConnection stmt)
+            meta (.getParameterMetaData stmt)
+            type-name (.getParameterTypeName meta i)]
+        (if-let [elem-type (when (= (first type-name) \_) (apply str (rest type-name)))]
+          (.setObject stmt i (.createArrayOf conn elem-type (to-array v)))
+          (.setObject stmt i v)))))
 
 (extend-protocol jdbc/ISQLValue
   clojure.lang.IPersistentMap
@@ -65,9 +65,10 @@
         ("json" "jsonb") (json/decode value true)
         :else value)))
 
-  java.sql.Array
-  (result-set-read-column [val _ _]
-    (into [] (.getArray val))))
+  ;; java.sql.Array
+  ;; (result-set-read-column [val _ _]
+  ;;   (into [] (.getArray val)))
+  )
 
 (def memoized-kebab-keyword-ulate (memoize csk/->kebab-case-keyword))
 
@@ -85,3 +86,28 @@
 (defmethod hugsql.core/hugsql-result-fn :one [sym] 'flowbot.data.postgres/result-one-snake->kebab)
 (defmethod hugsql.core/hugsql-result-fn :* [sym] 'flowbot.data.postgres/result-many-snake->kebab)
 (defmethod hugsql.core/hugsql-result-fn :many [sym] 'flowbot.data.postgres/result-many-snake->kebab)
+
+(defn wrapped-query [from-db to-db query]
+  (fn [db m]
+    (->> m to-db (query db) from-db)))
+
+(defn def-wrapped-query* [from-db to-db query]
+  (let [{:keys [result] :as query-meta} (meta (resolve query))]
+    (case result
+      (:1 :one) `(def ~query ~(with-meta
+                                (wrapped-query @(resolve from-db) @(resolve to-db) @(resolve query))
+                                query-meta))
+      (:* :many) `(def ~query ~(with-meta
+                                 (wrapped-query #(mapv @(resolve from-db) %) @(resolve to-db) @(resolve query))
+                                 query-meta)))))
+
+(defmacro def-wrapped-queries
+  "Redefines each query var in queries to be
+  * (comp from-db query to-db) if the query returns a single result
+  * (comp #(mapv from-db %) query to-db) if the query returns multiple results
+  Preserves the query var's metadata and uses it to infer the result type."
+  [{:keys [from-db to-db queries]
+    :or {from-db identity
+         to-db identity}}]
+  `(do
+     ~@(map #(def-wrapped-query* from-db to-db %) queries)))
