@@ -5,11 +5,13 @@
             [cider-nrepl.main]
             ;; for integrant multimethods
             flowbot.data.postgres
+            flowbot.data.datahike
             flowbot.event.bus
             flowbot.discord.bot
             flowbot.discord.registrar
             flowbot.discord.message-dispatcher
-            flowbot.command.handler))
+            flowbot.command.handler
+            flowbot.mafia.command))
 
 (ig.repl/set-prep! config/system)
 

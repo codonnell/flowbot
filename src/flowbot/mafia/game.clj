@@ -1,6 +1,7 @@
 (ns flowbot.mafia.game
   (:require [clojure.tools.logging :as log]
             [clojure.spec.alpha :as s]
+            [clojure.set :as set]
             [flowbot.mafia.data.game :as game]
             [flowbot.mafia.data.event :as event]))
 
@@ -8,23 +9,23 @@
 ;; Game data manipulation
 ;; ----------------------------------------
 
-(defn init-game [{:keys [moderator-id] :as game}]
+(defn init-game [game]
   (assoc game
          ::game/stage ::game/registration
          ::game/registered-players #{}
-         ::game/past-days []))
+         ::game/days []))
 
-(defn unstarted? [{:keys [::game/stage] :as game}]
+(defn unstarted? [{::game/keys [stage] :as game}]
   (#{::game/registration ::game/role-distribution} stage))
 
 (def started? (complement unstarted?))
 
-(defn end-registration [{:keys [::game/registered-players] :as game}]
+(defn end-registration [{::game/keys [registered-players] :as game}]
   (assoc game
          ::game/stage ::game/role-distribution
          ::game/players registered-players))
 
-(defn- registration-open? [{:keys [::game/stage]}]
+(defn- registration-open? [{::game/keys [stage]}]
   (= ::game/registration stage))
 
 (defn join-game [game player-id]
@@ -35,66 +36,86 @@
   (cond-> game
     (registration-open? game) (update ::game/registered-players disj player-id)))
 
-(defn day? [{:keys [::game/stage]}]
+(defn day? [{::game/keys [stage]}]
   (= ::game/day stage))
 
-(defn night? [{:keys [::game/stage]}]
+(defn night? [{::game/keys [stage]}]
   (= ::game/night stage))
 
-(defn start-day [{:keys [::game/past-days ::game/stage] :as game}]
+(defn start-day [{::game/keys [past-days stage] :as game}]
   (if (#{::game/role-distribution ::game/night} stage)
-    (assoc game
-           ::game/current-day {::game/votes {}}
-           ::game/stage ::game/day)
-    game))
-
-(defn end-day [{:keys [::game/current-day] :as game}]
-  (if (day? game)
     (-> game
-        (assoc ::game/stage ::game/night)
-        (update ::game/past-days conj current-day)
-        (dissoc ::game/current-day))
+        (update ::game/days conj {::game/votes []})
+        (assoc ::game/stage ::game/day))
     game))
 
-(defn kill [game player-id]
-  (-> game
-      (update ::game/players disj player-id)
-      (update-in [::game/current-day ::game/votes] dissoc player-id)))
+(defn end-day [{::game/keys [current-day] :as game}]
+  (if (day? game)
+    (assoc game ::game/stage ::game/night)
+    game))
 
-(defn revive [{:keys [::game/registered-players] :as game} player-id]
-  (cond-> game
-    (registered-players player-id) (update ::game/players conj player-id)))
+(defn- update-current-day [{::game/keys [days] :as game} f & args]
+  (update-in game [::game/days (dec (count days))] #(apply f % args)))
 
-(defn- alive? [{:keys [::game/players]} player-id]
+(defn- update-current-votes [game f & args]
+  (update-current-day game update ::game/votes #(apply f % args)))
+
+(defn- alive? [{::game/keys [players] :as game} player-id]
   (players player-id))
 
-(defn vote [{:keys [::game/players] :as game} voter-id votee-id]
+(defn vote [{::game/keys [players] :as game} voter-id votee-id]
   (if (and (alive? game voter-id) (day? game))
-    (update-in game [::game/current-day ::game/votes] assoc voter-id votee-id)
+    (update-current-votes game conj #::game{:voter-id voter-id
+                                            :votee-id votee-id})
     game))
 
 (defn unvote [game voter-id]
   (if (and (alive? game voter-id) (day? game))
-    (update-in game [::game/current-day ::game/votes] dissoc voter-id)))
+    (update-current-votes game conj #::game{:voter-id voter-id
+                                            :votee-id nil})
+    game))
+
+(defn today-votes [{::game/keys [days]}]
+  (::game/votes (peek days)))
+
+(defn valid-today-votes [{::game/keys [players] :as game}]
+  (filterv (comp players ::game/voter-id) (today-votes game)))
+
+(defn votes-by-voter-id [votes]
+  (reduce (fn [votes-by-voter {::game/keys [voter-id votee-id] :as vote}]
+            (assoc votes-by-voter voter-id votee-id))
+          {}
+          votes))
 
 (defn vote-totals [votes]
   (reduce-kv (fn [totals _ votee-id]
                (update totals votee-id (fnil inc 0)))
-             {}
-             votes))
+             nil
+             (votes-by-voter-id votes)))
 
-(defn yesterday-totals [{:keys [::game/past-days]}]
-  (when-not (empty? past-days)
-    (-> past-days peek ::game/votes vote-totals)))
+(defn yesterday-totals [{::game/keys [days stage]}]
+  (cond-> days
+    (= ::game/day stage) pop
+    true (-> peek ::game/votes vote-totals)))
 
-(defn today-totals [{:keys [::game/current-day]}]
-  (when (some? current-day)
-    (-> current-day ::game/votes vote-totals)))
+(defn today-totals [{::game/keys [stage] :as game}]
+  (when (= ::game/day stage)
+    (or (vote-totals (valid-today-votes game)) {})))
 
-(defn nonvoters [{:keys [::game/players ::game/current-day]
-                  {:keys [::game/votes]} ::game/current-day}]
-  (when (some? current-day)
-    (into #{} (remove #(contains? votes %)) players)))
+(defn nonvoters [{::game/keys [players days stage] :as game}]
+  (when (= ::game/day stage)
+    (let [votes (valid-today-votes game)]
+      (set/difference players
+                      (into #{}
+                            (keep (fn [[voter-id votee-id]] (when votee-id voter-id)))
+                            (votes-by-voter-id votes))))))
+
+(defn kill [game player-id]
+  (update game ::game/players disj player-id))
+
+(defn revive [{:keys [::game/registered-players] :as game} player-id]
+  (cond-> game
+    (registered-players player-id) (update ::game/players conj player-id)))
 
 
 ;; Game state update events
@@ -112,9 +133,9 @@
 
 (defmulti process-event* (fn [_ {:keys [::event/type]}] type))
 
-(defmethod process-event* ::event/start-game
+(defmethod process-event* ::event/end-registration
   [game _]
-  (start-day game))
+  (end-registration game))
 
 (defmethod process-event* ::event/join-game
   [game {:keys [::event/player-id]}]
@@ -125,8 +146,12 @@
   (leave-game game player-id))
 
 (defmethod process-event* ::event/vote
-  [game {:keys [::event/voter ::event/votee]}]
-  (vote game voter votee))
+  [game {:keys [::event/voter-id ::event/votee-id]}]
+  (vote game voter-id votee-id))
+
+(defmethod process-event* ::event/unvote
+  [game {:keys [::event/voter-id]}]
+  (unvote game voter-id))
 
 (defmethod process-event* ::event/start-day
   [game _]

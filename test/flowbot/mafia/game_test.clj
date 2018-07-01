@@ -10,7 +10,7 @@
   (gen/generate (s/gen spec)))
 
 (defn- initialized-game []
-  (-> ::d.g/db-game generate game/init-game))
+  (-> ::d.g/initial-game generate game/init-game))
 
 (defn- gen-player-ids [n]
   (gen/generate (gen/vector-distinct (s/gen ::d.g/player-id) {:num-elements n})))
@@ -27,11 +27,10 @@
       game/start-day))
 
 (deftest init-game
-  (let [game (generate ::d.g/db-game)
+  (let [game (generate ::d.g/initial-game)
         game' (game/init-game game)]
     (is (= ::d.g/registration (::d.g/stage game')))
-    (is (= [] (::d.g/past-days game')))
-    (is (= [] (::d.g/events game')))
+    (is (= [] (::d.g/days game')))
     (let [initial-keys [::d.g/channel-id ::d.g/moderator-id ::d.g/id ::d.g/created-at]]
       (is (= (select-keys game initial-keys) (select-keys game' initial-keys))))
     (is (= #{} (::d.g/registered-players game')))))
@@ -69,10 +68,8 @@
       (let [rd-stage (-> game game/end-registration)
             night-stage (-> game game/end-registration game/start-day game/end-day)
             changes-to-day? (fn [game]
-                              (is (not (::d.g/current-day game)))
                               (is (not (= ::d.g/day (::d.g/stage game))))
                               (let [day-game (game/start-day game)]
-                                (is (::d.g/current-day day-game))
                                 (is (= ::d.g/day (::d.g/stage day-game)))))]
         (changes-to-day? rd-stage)
         (changes-to-day? night-stage)))))
@@ -87,12 +84,9 @@
         (is (= night-stage (game/end-day night-stage)))))
     (testing "End day adds current-day to the end of past-days, removes current-day, and changes stage to night."
       (let [day-stage (-> game game/end-registration game/start-day)]
-        (is (::d.g/current-day day-stage))
         (is (= ::d.g/day (::d.g/stage day-stage)))
         (let [night-stage (game/end-day day-stage)]
-          (is (not (::d.g/current-day night-stage)))
-          (is (= ::d.g/night (::d.g/stage night-stage)))
-          (is (= (::d.g/current-day day-stage) (peek (::d.g/past-days night-stage)))))))))
+          (is (= ::d.g/night (::d.g/stage night-stage))))))))
 
 (deftest kill
   (let [player-id (generate ::d.g/player-id)
@@ -120,14 +114,25 @@
     (is (= #{} (::d.g/players failed-revive-game))
         "Reviving an unregistered player does not add them to the players list")))
 
+(defn- todays-votes-by [game player-id]
+  (->> game game/valid-today-votes (filterv #(= player-id (::d.g/voter-id %)))))
+
+(defn- ballot-for [game player-id]
+  (->> player-id
+       (todays-votes-by game)
+       peek
+       ::d.g/votee-id))
+
+(defn- has-not-voted? [game player-id]
+  (->> player-id
+       (todays-votes-by game)
+       peek
+       ::d.g/votee-id
+       nil?))
+
 (deftest vote
   (let [[player1 player2 player3 :as player-ids] (gen-player-ids 3)
-        game (started-with-players player-ids)
-        ballot-for (fn [game player-id] (get-in game [::d.g/current-day ::d.g/votes player-id]))
-        has-not-voted? (fn [game player-id] (-> game
-                                                (get-in [::d.g/current-day ::d.g/votes])
-                                                (contains? player-id)
-                                                not))]
+        game (started-with-players player-ids)]
     (is (= player2 (ballot-for (game/vote game player1 player2) player1))
         "Single votes are recorded")
     (is (= player3 (ballot-for (-> game (game/vote player1 player2) (game/vote player1 player3))
@@ -141,9 +146,9 @@
       (testing "Multiple votes are recorded"
         (is (= player2 (ballot-for game' player1)))
         (is (= player3 (ballot-for game' player2)))))
-    (is (has-not-voted? (-> game (game/vote player1 player2) (game/unvote player1))
-                        player1)
-        "Unvote removes votes (different from voting no one)")
+    ;; (is (has-not-voted? (-> game (game/vote player1 player2) (game/unvote player1))
+    ;;                     player1)
+    ;;     "Unvote removes votes (different from voting no one)")
     (is (has-not-voted? (-> game (game/kill player1) (game/vote player1 player2))
                         player1)
         "Dead players cannot vote")
@@ -157,7 +162,7 @@
 (deftest vote-totals
   (let [[player1 player2 player3 :as players] (gen-player-ids 3)
         game (started-with-players players)
-        current-totals (fn [game] (game/vote-totals (get-in game [::d.g/current-day ::d.g/votes])))]
+        current-totals (fn [game] (game/vote-totals (game/valid-today-votes game)))]
     (is (= {player1 1 player2 1}
            (-> game (game/vote player1 player2) (game/vote player3 player1) current-totals))
         "Single votes are counted")
@@ -167,8 +172,8 @@
     (is (= {nil 1}
            (-> game (game/vote player1 player2) (game/vote player1 nil) current-totals))
         "Votes for no one are counted")
-    (is (= {} (-> game (game/vote player1 player2) (game/unvote player1) current-totals))
-        "Unvotes are not counted")))
+    (is (= {nil 1} (-> game (game/vote player1 player2) (game/unvote player1) current-totals))
+        "Unvotes are counted")))
 
 (deftest today-and-yesterday-totals
   (let [[player1 player2 player3 :as players] (gen-player-ids 3)
@@ -198,8 +203,8 @@
                  (game/vote player3 player1))]
     (is (= #{player2} (game/nonvoters game))
         "A single nonvoter is counted during the day")
-    (is (= #{} (-> game (game/vote player2 nil) game/nonvoters))
-        "Players that vote for no one are not counted as nonvoters")
+    (is (= #{player2} (-> game (game/vote player2 nil) game/nonvoters))
+        "Players that vote for no one are counted as nonvoters")
     (is (= #{player1 player2} (-> game (game/unvote player1) game/nonvoters))
         "Players that unvote are counted as nonvoters")
     (is (nil? (-> game game/end-day game/nonvoters))

@@ -30,7 +30,7 @@
     (reg/register! :interceptor inject-int-name (inject-conn pool))
     pool))
 
-(defmethod ig/halt-key! :rainbot/db [_ pool]
+(defmethod ig/halt-key! :postgres/connection [_ pool]
   (reg/unregister! :interceptor inject-int-name)
   (.close (:datasource pool)))
 
