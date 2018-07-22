@@ -1,6 +1,8 @@
 (ns flowbot.mafia.data.game
   (:require [hugsql.core :as hugsql]
             [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
+            [flowbot.mafia.data.player :as player]
             [flowbot.data.postgres :as pg]
             [flowbot.util :as util])
   (:import [flowbot.data.postgres Conn]))
@@ -34,12 +36,11 @@
 ;; definition of current game state. While we add events to the game state map,
 ;; game functions should not know about or rely upon events.
 
-(s/def ::player-id pos-int?)
-(s/def ::players (s/coll-of ::player-id :kind set?))
-(s/def ::registered-players (s/coll-of ::player-id :kind set?))
+(s/def ::players (s/map-of ::player/id ::player/player))
+(s/def ::registered-players (s/map-of ::player/id ::player/player))
 
-(s/def ::voter-id ::player-id)
-(s/def ::votee-id (s/or :player ::player-id
+(s/def ::voter-id ::player/id)
+(s/def ::votee-id (s/or :player ::player/id
                         :no-one #{::no-one}
                         :invalidated #{::invalidated}))
 (s/def ::vote (s/keys :req [::voter-id ::votee-id]))
@@ -50,7 +51,7 @@
 (s/def ::past-days (s/coll-of ::day :kind vector?))
 
 (s/def ::stage #{::registration ::role-distribution ::day ::night ::finished})
-(s/def ::moderator-id ::player-id)
+(s/def ::moderator-id ::player/id)
 (s/def ::channel-id pos-int?)
 (s/def ::id uuid?)
 (s/def ::created-at inst?)

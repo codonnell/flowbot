@@ -88,8 +88,26 @@
               (update ctx :effects assoc
                       ::game/update-game (game/process-event
                                           game {::data.event/type ::data.event/join-game
-                                                ::data.event/player-id (util/parse-long (get-in event [:author :id]))})
+                                                ::data.event/player-id (util/parse-long (get-in event [:author :id]))
+                                                ::data.event/username (get-in event [:author :username])})
                       ::discord.action/reply {:content "You have joined the game."}))})})
+
+(def leave-command
+  {:name :leave
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  mafia.int/current-game-lens
+                  (mafia.int/stage #{::data.game/registration})
+                  (mafia.int/role #{::data.game/player})]
+   :handler-fn
+   (int.reg/interceptor
+    {:name ::leave-handler
+     :leave (fn [{::game/keys [game] :keys [event] :as ctx}]
+              (update ctx :effects assoc
+                      ::game/update-game (game/process-event
+                                          game {::data.event/type ::data.event/leave-game
+                                                ::data.event/player-id (util/parse-long (get-in event [:author :id]))})
+                      ::discord.action/reply {:content "You have left the game."}))})})
 
 (def start-day-command
   {:name :start-day
@@ -177,6 +195,7 @@
                             :start-day start-day-command
                             :end-day end-day-command
                             :join join-command
+                            :leave leave-command
                             :vote vote-command
                             :my-vote my-vote-command
                             :end-game end-game-command}}]

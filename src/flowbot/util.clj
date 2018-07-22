@@ -1,5 +1,9 @@
 (ns flowbot.util
-  (:require [clojure.walk :as walk]))
+  (:require [clojure.walk :as walk]
+            [clojure.string :as str]
+            [clojure.spec.alpha :as s]))
+
+(s/def ::nonblank-string (s/and string? #(not (str/blank? %))))
 
 (defn transform-keys [m f]
   (let [transform (fn [[k v]] [(f k) v])]

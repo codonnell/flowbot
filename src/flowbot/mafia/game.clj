@@ -3,7 +3,8 @@
             [clojure.spec.alpha :as s]
             [clojure.set :as set]
             [flowbot.mafia.data.game :as game]
-            [flowbot.mafia.data.event :as event]))
+            [flowbot.mafia.data.event :as event]
+            [flowbot.mafia.data.player :as player]))
 
 
 ;; Game data manipulation
@@ -12,7 +13,7 @@
 (defn init-game [{::game/keys [moderator-id] :as game}]
   (assoc game
          ::game/stage ::game/registration
-         ::game/registered-players #{}
+         ::game/registered-players {}
          ::game/past-days []))
 
 (defn unstarted? [{::game/keys [stage] :as game}]
@@ -28,13 +29,13 @@
 (defn- registration-open? [{:keys [::game/stage]}]
   (= ::game/registration stage))
 
-(defn join-game [game player-id]
+(defn join-game [game {::player/keys [id] :as player}]
   (cond-> game
-    (registration-open? game) (update ::game/registered-players conj player-id)))
+    (registration-open? game) (update ::game/registered-players assoc id player)))
 
 (defn leave-game [game player-id]
   (cond-> game
-    (registration-open? game) (update ::game/registered-players disj player-id)))
+    (registration-open? game) (update ::game/registered-players dissoc player-id)))
 
 (defn day? [{::game/keys [stage]}]
   (= ::game/day stage))
@@ -111,7 +112,7 @@
                   {::game/keys [votes]} ::game/current-day
                   :as game}]
   (when (day? game)
-    (set/difference players (into #{} (map ::game/voter-id) votes))))
+    (set/difference (set (keys players)) (into #{} (map ::game/voter-id) votes))))
 
 (defn invalidate-votes-for [{{::game/keys [votes]} ::game/current-day :as game} votee-id]
   (if (day? game)
@@ -139,13 +140,14 @@
 
 (defn kill [game player-id]
   (-> game
-      (update ::game/players disj player-id)
+      (update ::game/players dissoc player-id)
       (invalidate-votes-for player-id)
       (invalidate-vote-by player-id)))
 
 (defn revive [{::game/keys [registered-players] :as game} player-id]
   (cond-> game
-    (registered-players player-id) (update ::game/players conj player-id)))
+    (registered-players player-id)
+    (update ::game/players assoc player-id (registered-players player-id))))
 
 
 ;; Game state update events
@@ -168,15 +170,15 @@
   (start-day game))
 
 (defmethod process-event* ::event/join-game
-  [game {:keys [::event/player-id]}]
-  (join-game game player-id))
+  [game {::event/keys [player-id username]}]
+  (join-game game #::player{:id player-id :username username}))
 
 (defmethod process-event* ::event/leave-game
-  [game {:keys [::event/player-id]}]
+  [game {::event/keys [player-id]}]
   (leave-game game player-id))
 
 (defmethod process-event* ::event/vote
-  [game {:keys [::event/voter ::event/votee]}]
+  [game {::event/keys [voter votee]}]
   (vote game voter votee))
 
 (defmethod process-event* ::event/start-day
@@ -188,11 +190,11 @@
   (end-day game))
 
 (defmethod process-event* ::event/kill
-  [game {:keys [::event/player-id]}]
+  [game {::event/keys [player-id]}]
   (kill game player-id))
 
 (defmethod process-event* ::event/revive
-  [game {:keys [::event/player-id]}]
+  [game {::event/keys [player-id]}]
   (revive game player-id))
 
 (defmethod process-event* ::event/end-registration

@@ -2,6 +2,7 @@
   (:require [hugsql.core :as hugsql]
             [clojure.spec.alpha :as s]
             [flowbot.mafia.data.game :as game]
+            [flowbot.mafia.data.player :as player]
             [flowbot.data.postgres :as pg]
             [flowbot.util :as util])
   (:import [flowbot.data.postgres Conn]))
@@ -48,7 +49,7 @@
                 ::start-game
                 ::end-registration})
 
-(s/def ::player-id ::game/player-id)
+(s/def ::player-id ::player/id)
 (s/def ::voter ::player-id)
 (s/def ::votee (s/nilable ::player-id))
 
