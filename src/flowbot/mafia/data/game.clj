@@ -46,8 +46,12 @@
 (s/def ::players (s/coll-of ::player-id :kind set?))
 (s/def ::registered-players (s/coll-of ::player-id :kind set?))
 
-(s/def ::votee (s/nilable ::player-id))
-(s/def ::votes (s/map-of ::player-id ::votee))
+(s/def ::voter-id ::player-id)
+(s/def ::votee-id (s/or :player ::player-id
+                        :no-one #{::no-one}
+                        :invalidated #{::invalidated}))
+(s/def ::vote (s/keys :req [::voter-id ::votee-id]))
+(s/def ::votes (s/coll-of ::vote :kind vector?))
 
 (s/def ::day (s/keys :req [::votes]))
 (s/def ::current-day (s/keys :req-un [::votes ::players]))

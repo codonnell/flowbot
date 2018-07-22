@@ -142,6 +142,13 @@
                                                 ::data.event/votee (-> event :user-mentions first :id util/parse-long)})
                       ::discord.action/reply {:content "Your vote has been registered."}))})})
 
+(defn format-my-vote [votee]
+  (case votee
+    ::data.game/no-one "You voted for no one."
+    ::data.game/invalidated "Your vote was invalidated."
+    nil "You have not voted yet."
+    (str "You voted for <@!" votee ">.")))
+
 (def my-vote-command
   {:name :my-vote
    :interceptors [discord.action/reply-interceptor
@@ -158,10 +165,9 @@
                                               (let [votee (-> game
                                                               ::data.game/current-day
                                                               ::data.game/votes
+                                                              game/votes-by-voter-id
                                                               (get (-> event :author :id util/parse-long)))]
-                                                (if votee
-                                                  (str "You voted for <@!" votee ">.")
-                                                  "You haven't voted for anyone."))}))})})
+                                                (format-my-vote votee))}))})})
 
 (defmethod ig/init-key :mafia/command [_ _]
   (let [registry {:effect {::start-game start-game-effect
