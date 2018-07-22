@@ -15,9 +15,8 @@
                           {::discord.action/reply {:content "Hello!"}})}}})
 
 (defn- execute-command [{name :command :as message}]
-  (let [command (reg/get :command name)
-        handler (event.handler/handler command)]
-    (event.handler/execute handler message)))
+  (when-let [command (reg/get :command name)]
+    (event.handler/execute (event.handler/handler command) message)))
 
 (defmethod ig/init-key :command/handler [_ {:keys [event-bus]}]
   (let [command-stream (bus/subscribe event-bus :command)]
