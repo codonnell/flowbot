@@ -113,10 +113,10 @@
   (not (registered-players user-id)))
 
 (defmethod has-role? ::data.game/alive [{::data.game/keys [players]} user-id _]
-  (boolean (players user-id)))
+  (players user-id))
 
 (defmethod has-role? ::data.game/dead [{::data.game/keys [players registered-players]} user-id _]
-  (boolean (and (registered-players user-id) (not (players user-id)))))
+  (and (registered-players user-id) (not (players user-id))))
 
 (defn role
   "Interceptor that takes a set of roles

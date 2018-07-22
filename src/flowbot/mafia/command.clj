@@ -2,6 +2,7 @@
   (:require [flowbot.mafia.interceptor :as mafia.int]
             [flowbot.mafia.data.game :as data.game]
             [flowbot.mafia.data.event :as data.event]
+            [flowbot.mafia.data.player :as data.player]
             [flowbot.mafia.game :as game]
             [flowbot.data.postgres :as pg]
             [flowbot.registrar :as reg]
@@ -160,12 +161,12 @@
                                                 ::data.event/votee (-> event :user-mentions first :id util/parse-long)})
                       ::discord.action/reply {:content "Your vote has been registered."}))})})
 
-(defn format-my-vote [votee]
+(defn format-my-vote [{::data.game/keys [players]} votee]
   (case votee
     ::data.game/no-one "You voted for no one."
     ::data.game/invalidated "Your vote was invalidated."
     nil "You have not voted yet."
-    (str "You voted for <@!" votee ">.")))
+    (str "You voted for " (get-in players [votee ::data.player/username]) ".")))
 
 (def my-vote-command
   {:name :my-vote
@@ -185,7 +186,7 @@
                                                               ::data.game/votes
                                                               game/votes-by-voter-id
                                                               (get (-> event :author :id util/parse-long)))]
-                                                (format-my-vote votee))}))})})
+                                                (format-my-vote game votee))}))})})
 
 (defmethod ig/init-key :mafia/command [_ _]
   (let [registry {:effect {::start-game start-game-effect
