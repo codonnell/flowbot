@@ -27,12 +27,6 @@
                                                     q-ns
                                                     {:to-db (fn [id] {:channel-id id})})}))
 
-#_(pg/def-wrapped-queries {:from-db from-db
-                           :queries [insert-mafia-event!
-                                     get-mafia-event-by-id
-                                     get-mafia-events-by-mafia-game-id
-                                     get-mafia-events-by-channel-id]})
-
 ;; Events
 ;; [::vote {:voter voter :votee votee}]
 ;; [::start-day]

@@ -26,14 +26,6 @@
                                               q-ns
                                               {:to-db (fn [id] {:id id})})}))
 
-#_(pg/def-wrapped-queries {:from-db from-db
-                           :queries [insert-mafia-game!
-                                     get-mafia-game-by-id
-                                     get-latest-mafia-game-by-channel-id
-                                     get-unfinished-mafia-game-by-channel-id
-                                     get-unfinished-mafia-games
-                                     finish-mafia-game-by-id!]})
-
 ;; Game data definition
 ;; ----------------------------------------
 
