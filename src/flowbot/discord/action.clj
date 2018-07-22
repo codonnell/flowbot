@@ -73,11 +73,13 @@
 (def reply-interceptor
   {:name  ::reply
    :leave (fn [{:keys [event effects] :as context}]
-            (let [{:keys [content tts embed]} (::reply effects)]
-              (update context :effects
-                      #(-> %
-                           (assoc ::send-message
-                                  (cond-> [(:channel event) content]
-                                    (some? embed) (into [:embed embed])
-                                    (some? tts)   (into [:tts tts])))
-                           (dissoc ::reply)))))})
+            (let [{:keys [content tts embed] :as reply} (::reply effects)]
+              (cond-> context
+                reply
+                (update :effects
+                        #(-> %
+                             (assoc ::send-message
+                                    (cond-> [(:channel event) content]
+                                      (some? embed) (into [:embed embed])
+                                      (some? tts)   (into [:tts tts])))
+                             (dissoc ::reply))))))})

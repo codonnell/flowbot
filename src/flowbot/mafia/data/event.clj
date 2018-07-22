@@ -3,23 +3,35 @@
             [clojure.spec.alpha :as s]
             [flowbot.mafia.data.game :as game]
             [flowbot.data.postgres :as pg]
-            [flowbot.util :as util]))
+            [flowbot.util :as util])
+  (:import [flowbot.data.postgres Conn]))
+
+(defprotocol Event
+  (insert-mafia-event! [this event])
+  (get-mafia-event-by-id [this id])
+  (get-mafia-events-by-mafia-game-id [this mafia-game-id])
+  (get-mafia-events-by-channel-id [this channel-id]))
 
 (hugsql/def-db-fns "flowbot/mafia/data/event.sql" {:quoting :ansi})
 
-(def to-db util/de-ns-map-keys)
+(let [q-ns "flowbot.mafia.data.event"]
+  (extend Conn
+    Event
+    {:insert-mafia-event! (pg/wrap-query #'insert-mafia-event!* q-ns)
+     :get-mafia-event-by-id (pg/wrap-query #'get-mafia-event-by-id* q-ns
+                                           {:to-db (fn [id] {:id id})})
+     :get-mafia-events-by-mafia-game-id (pg/wrap-query #'get-mafia-events-by-mafia-game-id*
+                                                       q-ns
+                                                       {:to-db (fn [id] {:mafia-game-id id})})
+     :get-mafia-events-by-channel-id (pg/wrap-query #'get-mafia-events-by-channel-id*
+                                                    q-ns
+                                                    {:to-db (fn [id] {:channel-id id})})}))
 
-(defn from-db [db-event]
-  (-> db-event
-      (util/ns-map-keys "flowbot.mafia.data.event")
-      (update-in [::payload ::type] keyword)))
-
-(pg/def-wrapped-queries {:from-db from-db
-                         :to-db to-db
-                         :queries [insert-mafia-event!
-                                   get-mafia-event-by-id
-                                   get-mafia-events-by-mafia-game-id
-                                   get-mafia-events-by-channel-id]})
+#_(pg/def-wrapped-queries {:from-db from-db
+                           :queries [insert-mafia-event!
+                                     get-mafia-event-by-id
+                                     get-mafia-events-by-mafia-game-id
+                                     get-mafia-events-by-channel-id]})
 
 ;; Events
 ;; [::vote {:voter voter :votee votee}]

@@ -3,26 +3,34 @@
             [flowbot.mafia.data.event :as data.event]
             [flowbot.mafia.data.game :as data.game]
             [flowbot.data.postgres :as pg]
-            [flowbot.data.datahike :as dh]
             [flowbot.discord.action :as discord.action]
             [flowbot.interceptor.registrar :as int.reg]
             [flowbot.util :as util]
             [io.pedestal.interceptor.chain :as int.chain]
-            [datahike.api :as d]
             [clojure.data]
             [clojure.java.jdbc :as jdbc]
             [clojure.string :as str]
             [clojure.tools.logging :as log]))
 
+(defn- msg->channel-id [msg]
+  (Long/parseLong (get-in msg [:channel :id])))
+
 (defn- db-event->event [db-event]
   (-> db-event
-      :payload
-      (update ::game/type keyword)))
+      ::data.event/payload
+      (update ::data.event/type keyword)))
 
 (defn- restore-game [db-game db-events]
   (let [game (game/init-game db-game)
         events (mapv db-event->event db-events)]
     (game/replay-events game events)))
+
+(defn- add-reply-text [ctx text]
+  (update ctx :effects assoc ::discord.action/reply {:content text}))
+
+(defn- terminate-with-reply
+  [ctx text]
+  (int.chain/terminate (add-reply-text ctx text)))
 
 (def current-game-lens
   "Interceptor that injects the current game state as a value assoc'd to the
@@ -35,38 +43,32 @@
   value is nil."
   {:name ::inject-current-game
    :enter (fn [{:keys [::pg/conn event] :as ctx}]
-            (let [channel-id (get-in event [:channel :id])
-                  game (data.game/get-unfinished-mafia-game-by-channel-id conn {:channel-id channel-id})
+            (let [channel-id (msg->channel-id event)
+                  game (data.game/get-unfinished-mafia-game-by-channel-id conn channel-id)
                   events (when game
-                           (data.event/get-mafia-events-by-mafia-game-id conn {:mafia-game-id (:id game)}))]
-              (cond-> ctx
-                game (assoc ctx ::game/game (restore-game game events)))))
+                           (data.event/get-mafia-events-by-mafia-game-id conn (::data.game/id game)))]
+              (if game
+                (assoc ctx ::game/game (restore-game game events))
+                (terminate-with-reply ctx "There is no game currently running."))))
    :leave (fn [{:keys [::pg/conn event ::game/game effects] :as ctx}]
             (if-some [updated-game (::game/update-game effects)]
-              (let [[_ nils-then-new-events _] (clojure.data/diff (::game/events game)
-                                                                  (::game/events updated-game))]
+              (let [[_ nils-then-new-events _] (clojure.data/diff (::data.event/events game)
+                                                                  (::data.event/events updated-game))]
                 (jdbc/with-db-transaction [tx conn]
                   (doseq [new-event (drop-while nil? nils-then-new-events)]
-                    (data.event/insert-mafia-event! tx {:mafia-game-id (:id game)
-                                                        :payload new-event}))))
+                    (data.event/insert-mafia-event! tx {:mafia-game-id (::data.game/id game)
+                                                        :payload new-event})))
+                (update ctx :effects dissoc ::game/update-game))
               ctx))})
 
-(defn- add-reply-text [ctx text]
-  (update ctx :effects assoc ::discord.action/reply {:content text}))
-
-(defn- terminate-with-reply
-  [ctx text]
-  (int.chain/terminate (add-reply-text ctx text)))
-
 (def no-game-running
-  (int.reg/interceptor
-   {:name ::no-gaming-running
-    :enter (fn [{:keys [{::pg/conn event}] :as ctx}]
-             (let [channel-id (get-in event [:channel :id])
-                   game (data.game/get-unfinished-mafia-game-by-channel-id conn {:channel-id channel-id})]
-               (if-not game
-                 ctx
-                 (terminate-with-reply ctx "There is no game currently running"))))}))
+  {:name ::no-gaming-running
+   :enter (fn [{:keys [::pg/conn event] :as ctx}]
+            (let [channel-id (msg->channel-id event)
+                  game (data.game/get-unfinished-mafia-game-by-channel-id conn channel-id)]
+              (if-not (seq game)
+                ctx
+                (terminate-with-reply ctx "There is a game currently running."))))})
 
 (defn- or-join [xs]
   (let [first-xs (butlast xs)
@@ -105,17 +107,16 @@
   (= moderator-id user-id))
 
 (defmethod has-role? ::data.game/player [{::data.game/keys [registered-players]} user-id _]
-  (boolean (game/contains-player? registered-players user-id)))
+  (boolean (registered-players user-id)))
 
 (defmethod has-role? ::data.game/not-player [{::data.game/keys [registered-players] :as game} user-id _]
-  (not (game/contains-player? registered-players user-id)))
+  (not (registered-players user-id)))
 
 (defmethod has-role? ::data.game/alive [{::data.game/keys [players]} user-id _]
-  (boolean (game/contains-player? players user-id)))
+  (boolean (players user-id)))
 
 (defmethod has-role? ::data.game/dead [{::data.game/keys [players registered-players]} user-id _]
-  (boolean (and (game/contains-player? registered-players user-id)
-                (not (game/contains-player? players user-id)))))
+  (boolean (and (registered-players user-id) (not (players user-id)))))
 
 (defn role
   "Interceptor that takes a set of roles
@@ -128,7 +129,7 @@
   {:name ::role
    :enter
    (fn [{:keys [::game/game event] :as ctx}]
-     (let [user-id (get-in event [:author :id])]
+     (let [user-id (util/parse-long (get-in event [:author :id]))]
        (if (some #(has-role? game user-id %) roles)
          ctx
          (terminate-with-reply
@@ -148,7 +149,7 @@
   {:name ::mentions-role
    :enter
    (fn [{:keys [::game/game event] :as ctx}]
-     (let [mentioned-id (-> event :user-mentions first :id)]
+     (let [mentioned-id (-> event :user-mentions first :id util/parse-long)]
        (if (some #(has-role? game mentioned-id %) roles)
          ctx
          (terminate-with-reply

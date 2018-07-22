@@ -3,7 +3,8 @@
             [flowbot.interceptor.registrar :as int.reg]
             [flowbot.effect.registrar :as effect.reg]
             [io.pedestal.interceptor :as int]
-            [io.pedestal.interceptor.chain :as chain]))
+            [io.pedestal.interceptor.chain :as chain]
+            [clojure.tools.logging :as log]))
 
 (defrecord Handler [interceptors handler-fn])
 
@@ -20,6 +21,7 @@
   "Applies a handler to an event, returning a map of effects."
   [{:keys [interceptors handler-fn] :as handler} event]
   {:pre [(valid-handler? handler)]}
+  (log/info {:interceptors interceptors :handler-fn handler-fn})
   (:effects (chain/execute {:event event} (conj interceptors handler-fn))))
 
 (defn execute

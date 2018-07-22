@@ -2,25 +2,37 @@
   (:require [hugsql.core :as hugsql]
             [clojure.spec.alpha :as s]
             [flowbot.data.postgres :as pg]
-            [flowbot.util :as util]))
+            [flowbot.util :as util])
+  (:import [flowbot.data.postgres Conn]))
+
+(defprotocol Game
+  (insert-mafia-game! [this game])
+  (get-mafia-game-by-id [this id])
+  (get-unfinished-mafia-game-by-channel-id [this channel-id])
+  (finish-mafia-game-by-id! [this id]))
 
 (hugsql/def-db-fns "flowbot/mafia/data/game.sql" {:quoting :ansi})
 
-(def to-db util/de-ns-map-keys)
+(let [q-ns "flowbot.mafia.data.game"]
+  (extend Conn
+    Game
+    {:insert-mafia-game! (pg/wrap-query #'insert-mafia-game!* q-ns)
+     :get-mafia-game-by-id (pg/wrap-query #'get-mafia-game-by-id* q-ns
+                                          {:to-db (fn [id] {:id id})})
+     :get-unfinished-mafia-game-by-channel-id (pg/wrap-query #'get-unfinished-mafia-game-by-channel-id*
+                                                             q-ns
+                                                             {:to-db (fn [id] {:channel-id id})})
+     :finish-mafia-game-by-id! (pg/wrap-query #'finish-mafia-game-by-id!*
+                                              q-ns
+                                              {:to-db (fn [id] {:id id})})}))
 
-(defn from-db [db-game]
-  (-> db-game
-      util/remove-nil-vals
-      (util/ns-map-keys "flowbot.mafia.data.game")))
-
-(pg/def-wrapped-queries {:from-db from-db
-                         :to-db to-db
-                         :queries [insert-mafia-game!
-                                   get-mafia-game-by-id
-                                   get-latest-mafia-game-by-channel-id
-                                   get-unfinished-mafia-game-by-channel-id
-                                   get-unfinished-mafia-games
-                                   finish-mafia-game-by-id!]})
+#_(pg/def-wrapped-queries {:from-db from-db
+                           :queries [insert-mafia-game!
+                                     get-mafia-game-by-id
+                                     get-latest-mafia-game-by-channel-id
+                                     get-unfinished-mafia-game-by-channel-id
+                                     get-unfinished-mafia-games
+                                     finish-mafia-game-by-id!]})
 
 ;; Game data definition
 ;; ----------------------------------------

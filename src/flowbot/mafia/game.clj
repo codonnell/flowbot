@@ -110,7 +110,7 @@
 ;; [::leave-game {:player-id player-id}]
 ;; [::start-game {:moderator-id moderator-id}] -- assigns roles and starts day
 
-(defmulti process-event* (fn [_ {:keys [::event/type]}] type))
+(defmulti process-event* (fn [_ {::event/keys [type]}] type))
 
 (defmethod process-event* ::event/start-game
   [game _]
@@ -143,6 +143,10 @@
 (defmethod process-event* ::event/revive
   [game {:keys [::event/player-id]}]
   (revive game player-id))
+
+(defmethod process-event* ::event/end-registration
+  [game _]
+  (end-registration game))
 
 (defn- push-event [game event]
   (update game ::event/events (fnil conj []) event))

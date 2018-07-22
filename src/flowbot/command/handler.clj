@@ -2,6 +2,7 @@
   (:require [manifold.stream :as stream]
             [manifold.bus :as bus]
             [integrant.core :as ig]
+            [clojure.tools.logging :as log]
             [flowbot.registrar :as reg]
             [flowbot.event.handler :as event.handler]
             [flowbot.discord.action :as discord.action]))

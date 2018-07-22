@@ -1,4 +1,15 @@
-(ns flowbot.util)
+(ns flowbot.util
+  (:require [clojure.walk :as walk]))
+
+(defn transform-keys [m f]
+  (let [transform (fn [[k v]] [(f k) v])]
+    (walk/postwalk (fn [x] (if (map? x)
+                             (into {} (map transform) x)
+                             x))
+                   m)))
+
+(defn deep-ns-map-keys [m ns]
+  (transform-keys m #(keyword ns (name %))))
 
 (defn ns-map-keys [m ns]
   (into {}
@@ -15,3 +26,5 @@
         (remove (fn [[_ v]] (nil? v)))
         m))
 
+(defn parse-long [s]
+  (Long/parseLong s))

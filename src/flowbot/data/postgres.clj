@@ -1,5 +1,6 @@
 (ns flowbot.data.postgres
   (:require [flowbot.registrar :as reg]
+            [flowbot.util :as util]
             [integrant.core :as ig]
             [cheshire.core :as json]
             hugsql.adapter
@@ -20,13 +21,16 @@
    :enter (fn [ctx]
             (assoc ctx ::conn conn))})
 
+(defrecord Conn [datasource])
+
 (defmethod ig/init-key :postgres/connection [_ {:keys [dbtype dbname host port user password]}]
   (let [url (str "jdbc:" dbtype "://" host ":" port "/" dbname)
-        pool {:datasource (doto (ComboPooledDataSource.)
-                            (.setDriverClass "org.postgresql.Driver")
-                            (.setJdbcUrl url)
-                            (.setUser user)
-                            (.setPassword password))}]
+        pool (map->Conn
+              {:datasource (doto (ComboPooledDataSource.)
+                             (.setDriverClass "org.postgresql.Driver")
+                             (.setJdbcUrl url)
+                             (.setUser user)
+                             (.setPassword password))})]
     (reg/register! :interceptor inject-int-name (inject-conn pool))
     pool))
 
@@ -39,15 +43,15 @@
     (.setType "json")
     (.setValue (json/encode value))))
 
-#_(extend-protocol clojure.java.jdbc/ISQLParameter
-    clojure.lang.IPersistentVector
-    (set-parameter [v ^java.sql.PreparedStatement stmt ^long i]
-      (let [conn (.getConnection stmt)
-            meta (.getParameterMetaData stmt)
-            type-name (.getParameterTypeName meta i)]
-        (if-let [elem-type (when (= (first type-name) \_) (apply str (rest type-name)))]
-          (.setObject stmt i (.createArrayOf conn elem-type (to-array v)))
-          (.setObject stmt i v)))))
+(extend-protocol clojure.java.jdbc/ISQLParameter
+  clojure.lang.IPersistentVector
+  (set-parameter [v ^java.sql.PreparedStatement stmt ^long i]
+    (let [conn (.getConnection stmt)
+          meta (.getParameterMetaData stmt)
+          type-name (.getParameterTypeName meta i)]
+      (if-let [elem-type (when (= (first type-name) \_) (apply str (rest type-name)))]
+        (.setObject stmt i (.createArrayOf conn elem-type (to-array v)))
+        (.setObject stmt i v)))))
 
 (extend-protocol jdbc/ISQLValue
   clojure.lang.IPersistentMap
@@ -65,10 +69,9 @@
         ("json" "jsonb") (json/decode value true)
         :else value)))
 
-  ;; java.sql.Array
-  ;; (result-set-read-column [val _ _]
-  ;;   (into [] (.getArray val)))
-  )
+  java.sql.Array
+  (result-set-read-column [val _ _]
+    (into [] (.getArray val))))
 
 (def memoized-kebab-keyword-ulate (memoize csk/->kebab-case-keyword))
 
@@ -87,27 +90,44 @@
 (defmethod hugsql.core/hugsql-result-fn :* [sym] 'flowbot.data.postgres/result-many-snake->kebab)
 (defmethod hugsql.core/hugsql-result-fn :many [sym] 'flowbot.data.postgres/result-many-snake->kebab)
 
-(defn wrapped-query [from-db to-db query]
-  (fn [db m]
-    (->> m to-db (query db) from-db)))
+;; (defn wrapped-query [from-db to-db query]
+;;   (fn [db m]
+;;     (->> m to-db (query db) from-db)))
 
-(defn def-wrapped-query* [from-db to-db query]
-  (let [{:keys [result] :as query-meta} (meta (resolve query))]
-    (case result
-      (:1 :one) `(def ~query ~(with-meta
-                                (wrapped-query @(resolve from-db) @(resolve to-db) @(resolve query))
-                                query-meta))
-      (:* :many) `(def ~query ~(with-meta
-                                 (wrapped-query #(mapv @(resolve from-db) %) @(resolve to-db) @(resolve query))
-                                 query-meta)))))
+;; (defn def-wrapped-query* [from-db to-db query]
+;;   (let [{:keys [result] :as query-meta} (meta (resolve query))]
+;;     (case result
+;;       (:1 :one) `(def ~query ~(with-meta
+;;                                 (wrapped-query @(resolve from-db) @(resolve to-db) @(resolve query))
+;;                                 query-meta))
+;;       (:* :many) `(def ~query ~(with-meta
+;;                                  (wrapped-query #(mapv @(resolve from-db) %) @(resolve to-db) @(resolve query))
+;;                                  query-meta)))))
 
-(defmacro def-wrapped-queries
-  "Redefines each query var in queries to be
-  * (comp from-db query to-db) if the query returns a single result
-  * (comp #(mapv from-db %) query to-db) if the query returns multiple results
-  Preserves the query var's metadata and uses it to infer the result type."
-  [{:keys [from-db to-db queries]
-    :or {from-db identity
-         to-db identity}}]
-  `(do
-     ~@(map #(def-wrapped-query* from-db to-db %) queries)))
+;; (defmacro def-wrapped-queries
+;;   "Redefines each query var in queries to be
+;;   * (comp from-db query to-db) if the query returns a single result
+;;   * (comp #(mapv from-db %) query to-db) if the query returns multiple results
+;;   Preserves the query var's metadata and uses it to infer the result type."
+;;   [{:keys [from-db to-db queries]
+;;     :or {from-db `identity
+;;          to-db `identity}}]
+;;   `(do
+;;      ~@(map #(def-wrapped-query* from-db to-db %) queries)))
+
+(defn wrap-query
+  "Given a var which derefs to a hugsql query, returns a function wrapping it with
+  `to-db` and `from-db`. Infers whether the query returns a collection or
+  singleton using the query-var's metadata"
+  ([query-var q-ns]
+   (wrap-query query-var q-ns nil))
+  ([query-var q-ns {:keys [to-db from-db]
+                    :or {to-db util/de-ns-map-keys
+                         from-db #(util/deep-ns-map-keys % (str q-ns))}}]
+   (let [{:keys [result]} (meta query-var)]
+     (case result
+       (:1 :one) (fn [conn m]
+                   (->> m to-db (query-var conn) from-db))
+       (:* :many) (fn [conn m]
+                    (->> m to-db (query-var conn) (mapv from-db)))
+       (throw (ex-info "Missing query metadata. Be sure to pass a var, and check for typos." {}))))))

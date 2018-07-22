@@ -23,4 +23,7 @@
  {:bot #ig/ref :discord/bot}
 
  :command/handler
- {:event-bus #ig/ref :event-bus}}
+ {:event-bus #ig/ref :event-bus}
+
+ :mafia/command
+ {:_reg #ig/ref :discord/registrar}}
