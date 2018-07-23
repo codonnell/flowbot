@@ -20,9 +20,9 @@ To start a repl, run `make repl`.
 
 ## Usage
 
-FIXME: explanation
+To build an ubarjar, run `make pack`, which will create an uberjar tagged with the latest git tag of this repo. You can run the jar with:
 
-    $ java -jar flowbot-0.1.0-standalone.jar [args]
+    $ java -jar flowbot.jar
 
 ## Options
 
