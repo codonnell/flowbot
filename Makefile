@@ -9,16 +9,10 @@ test:
 	clj -A\:test
 
 clean:
-	rm -rf target flowbot.jar
+	rm flowbot.jar
 
 uberjar:
-	clojure -A\:uberjar
-
-outdated:
-	clojure -Aoutdated -a outdated
-
-serve-jar:
-	source flowbot.env && source flowbot_secret.env && java -jar flowbot.jar -m flowbot.service
+	clojure -A\:pack mach.pack.alpha.capsule flowbot.jar --application-id flowbot --application-version "$(git describe)" -m flowbot.core
 
 migrate:
 	source flowbot.env && source flowbot_secret.env && clojure -m flowbot.migrate.up
