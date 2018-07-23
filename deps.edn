@@ -1,9 +1,9 @@
 {:paths ["src" "resources"]
  :deps
- {org.clojure/clojure              {:mvn/version "1.10.0-alpha4"}
+ {org.clojure/clojure              {:mvn/version "1.10.0-alpha6"}
   manifold                         {:mvn/version "0.1.6"}
-  ;; discord.clj                      {:mvn/version "1.1.1"}
-  discord.clj                      {:local/root "/home/chris/coding/discord.clj"}
+  discord.clj                      {:git/url "git@github.com:codonnell/discord.clj.git"
+                                    :sha "11ffab8f45203c6f4a566fa55355c2711beca933"}
   integrant                        {:mvn/version "0.7.0-alpha2"}
   com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
   clojure.java-time                {:mvn/version "0.3.1"}
@@ -15,7 +15,8 @@
   camel-snake-kebab                {:mvn/version "0.4.0"}
   org.clojure/tools.logging        {:mvn/version "0.4.0"}
   ch.qos.logback/logback-classic   {:mvn/version "1.2.3"}
-  io.pedestal/pedestal.interceptor {:mvn/version "0.5.3"}}
+  io.pedestal/pedestal.interceptor {:mvn/version "0.5.3"}
+  net.cgrand/xforms                {:mvn/version "0.18.2"}}
 
  :aliases
  {:dev

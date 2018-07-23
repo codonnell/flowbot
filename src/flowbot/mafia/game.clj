@@ -178,8 +178,12 @@
   (leave-game game player-id))
 
 (defmethod process-event* ::event/vote
-  [game {::event/keys [voter votee]}]
-  (vote game voter votee))
+  [game {::event/keys [voter-id votee-id]}]
+  (vote game voter-id votee-id))
+
+(defmethod process-event* ::event/unvote
+  [game {::event/keys [voter-id]}]
+  (unvote game voter-id))
 
 (defmethod process-event* ::event/start-day
   [game _]
