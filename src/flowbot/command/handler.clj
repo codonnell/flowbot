@@ -3,6 +3,7 @@
             [manifold.bus :as bus]
             [integrant.core :as ig]
             [io.pedestal.interceptor.chain :as int.chain]
+            [net.cgrand.xforms :as x]
             [clojure.tools.logging :as log]
             [clojure.string :as str]
             [flowbot.data.postgres :as pg]
@@ -31,7 +32,8 @@
 (def add-command-command
   {:name :add-command
    :interceptors [discord.action/reply-interceptor
-                  ::pg/inject-conn]
+                  ::pg/inject-conn
+                  discord.action/owner-role]
    :handler-fn
    (int.reg/interceptor
     {:name ::add-command-handler
@@ -51,6 +53,46 @@
           (catch Throwable e
             (log/error e))))})
 
+(def remove-command-command
+  {:name :remove-command
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  discord.action/owner-role]
+   :handler-fn
+   (int.reg/interceptor
+    {:name ::remove-command-handler
+     :leave (fn [{::pg/keys [conn] :keys [event] :as ctx}]
+              (update ctx :effects assoc
+                      ::remove-command {:command (parse-add-command (:content event))
+                                        :conn conn
+                                        :channel-id (channel-id event)}))})})
+
+(def remove-command-effect
+  {:name ::remove-command
+   :f (fn [{:keys [conn channel-id] {::d.custom/keys [name]} :command}]
+        (try
+          (let [send-message (:f (reg/get :effect ::discord.action/send-message))]
+            (if (d.custom/delete-custom-command-by-name! conn name)
+              (send-message [channel-id (str "Removed command `" name "`")])
+              (send-message [channel-id (str "No command with the name `" name "` exists")])))
+          (catch Throwable e
+            (log/error e))))})
+
+(def custom-commands-command
+  {:name :custom-commands
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  discord.action/owner-role]
+   :handler-fn
+   (int.reg/interceptor
+    {:name ::custom-commands-handler
+     :leave (fn [{::pg/keys [conn] :keys [event] :as ctx}]
+              (update ctx :effects assoc
+                      ::discord.action/reply {:content (x/str (comp (map ::d.custom/name)
+                                                                    (interpose ", "))
+                                                              (d.custom/get-custom-commands conn))}))})})
+
+
 (defn inject-custom-command [prefix]
   {:name ::d.custom/inject-custom-command
    :enter (fn [{::pg/keys [conn] :keys [event] :as ctx}]
@@ -62,9 +104,12 @@
 
 (def registry
   {:command
-   {:add-command add-command-command}
+   {:add-command add-command-command
+    :remove-command remove-command-command
+    :custom-commands custom-commands-command}
    :effect
-   {::add-command add-command-effect}})
+   {::add-command add-command-effect
+    ::remove-command remove-command-effect}})
 
 (defn- execute-command [{name :command :as message}]
   (when-let [command (reg/get :command name)]

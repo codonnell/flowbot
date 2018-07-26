@@ -1,7 +1,10 @@
 (ns flowbot.discord.action
   (:require [manifold.deferred :as d]
             [discord.http :as http]
-            [flowbot.interceptor.registrar :as int.reg]))
+            [io.pedestal.interceptor.chain :as int.chain]
+            [flowbot.interceptor.registrar :as int.reg]
+            [flowbot.config :as config]
+            [flowbot.util :as util]))
 
 ;; TODO: wrap all http actions from discord.clj with d/deferred
 ;; if http actions don't automatically retry, add optional retry
@@ -83,3 +86,21 @@
                                       (some? embed) (into [:embed embed])
                                       (some? tts)   (into [:tts tts])))
                              (dissoc ::reply))))))})
+
+(defn- add-reply-text [ctx text]
+  (update ctx :effects assoc ::reply {:content text}))
+
+(defn- terminate-with-reply
+  [ctx text]
+  (int.chain/terminate (add-reply-text ctx text)))
+
+(defn author-id [message]
+  (util/parse-long (get-in message [:author :id])))
+
+(def owner-role
+  {:name ::owner-role
+   :enter (fn [{:keys [event] :as ctx}]
+            ;; TODO: Fix up config and do this better
+            (if (= (util/parse-long (System/getenv "FLOWBOT_OWNER_ID")) (author-id event))
+              ctx
+              (terminate-with-reply ctx "Only the bot owner can do that.")))})

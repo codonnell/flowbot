@@ -24,5 +24,5 @@
      :get-custom-command-by-name (pg/wrap-query #'get-custom-command-by-name* q-ns
                                                 {:to-db (fn [name] {:name name})})
      :get-custom-commands (pg/wrap-query #'get-custom-commands* q-ns)
-     :delete-custom-command-by-name (pg/wrap-query #'delete-custom-command-by-name!* q-ns
-                                                   {:to-db (fn [name] {:name name})})}))
+     :delete-custom-command-by-name! (pg/wrap-query #'delete-custom-command-by-name!* q-ns
+                                                    {:to-db (fn [name] {:name name})})}))

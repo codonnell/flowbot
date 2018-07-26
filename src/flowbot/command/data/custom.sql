@@ -8,9 +8,9 @@ returning id, name, format_string;
 -- :doc Upsert a custom command by name
 insert into custom_command (name, format_string)
 values (:name, :format-string)
-       on conflict (name)
-       do update set name = excluded.name
-       returning id, name, format_string;
+on conflict (name)
+do update set format_string = excluded.format_string
+returning id, name, format_string;
 
 -- :name get-custom-command-by-id* :? :1
 -- :doc Retrieve a single custom command by id

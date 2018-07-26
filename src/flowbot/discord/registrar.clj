@@ -10,7 +10,8 @@
 
 (defmethod ig/init-key :discord/registrar [_ {:keys [bot]}]
   (let [registry {:effect (http-registry bot)
-                  :interceptor {::discord.action/reply discord.action/reply-interceptor}}]
+                  :interceptor {::discord.action/reply discord.action/reply-interceptor
+                                ::discord.action/owner-role discord.action/owner-role}}]
     (reg/add-registry! registry)
     registry))
 

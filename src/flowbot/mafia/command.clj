@@ -49,7 +49,9 @@
    :interceptors [discord.action/reply-interceptor
                   ::pg/inject-conn
                   mafia.int/current-game-lens
-                  (mafia.int/role #{::data.game/moderator})]
+                  (int.reg/or-auth
+                   discord.action/owner-role
+                   (mafia.int/role #{::data.game/moderator}))]
    :handler-fn
    (int.reg/interceptor
     {:name ::end-game-handler
