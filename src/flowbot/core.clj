@@ -10,7 +10,8 @@
             flowbot.discord.registrar
             flowbot.discord.message-dispatcher
             flowbot.mafia.command
-            flowbot.command.handler)
+            flowbot.command.handler
+            flowbot.command.custom)
   (:gen-class))
 
 (defn -main

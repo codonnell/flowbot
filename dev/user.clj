@@ -5,6 +5,7 @@
             [cider-nrepl.main]
             [flowbot.mafia.data.game :as d.g]
             [flowbot.mafia.data.event :as d.e]
+            [clojure.repl :refer :all]
             ;; for integrant multimethods
             flowbot.data.postgres
             flowbot.event.bus
@@ -12,7 +13,8 @@
             flowbot.discord.registrar
             flowbot.discord.message-dispatcher
             flowbot.mafia.command
-            flowbot.command.handler))
+            flowbot.command.handler
+            flowbot.command.custom))
 
 (ig.repl/set-prep! config/system)
 

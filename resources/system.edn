@@ -23,7 +23,17 @@
  {:bot #ig/ref :discord/bot}
 
  :command/handler
- {:event-bus #ig/ref :event-bus}
+ {:event-bus #ig/ref :event-bus
+  :bot #ig/ref :discord/bot
+  :_conn #ig/ref :postgres/connection
+  :_registrar #ig/ref :discord/registrar}
 
  :mafia/command
- {:_reg #ig/ref :discord/registrar}}
+ {:_reg #ig/ref :discord/registrar}
+
+ :command/custom
+ {:event-bus #ig/ref :event-bus
+  :conn #ig/ref :postgres/connection
+  :_handler #ig/ref :command/handler
+  :_registrar #ig/ref :discord/registrar
+  :_bot #ig/ref :discord/bot}}

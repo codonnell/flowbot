@@ -101,8 +101,14 @@
                          from-db #(util/deep-ns-map-keys % (str q-ns))}}]
    (let [{:keys [result]} (meta query-var)]
      (case result
-       (:1 :one) (fn [conn m]
-                   (->> m to-db (query-var conn) from-db))
-       (:* :many) (fn [conn m]
-                    (->> m to-db (query-var conn) (mapv from-db)))
+       (:1 :one) (fn query
+                   ([conn]
+                    (query conn nil))
+                   ([conn m]
+                    (->> m to-db (query-var conn) from-db)))
+       (:* :many) (fn query
+                    ([conn]
+                     (query conn nil))
+                    ([conn m]
+                     (->> m to-db (query-var conn) (mapv from-db))))
        (throw (ex-info "Missing query metadata. Be sure to pass a var, and check for typos." {}))))))
