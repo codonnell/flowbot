@@ -160,6 +160,7 @@
                              (game/vote id2 id3)
                              (game/kill id2))
           revive-vote-game (game/revive kill-vote-game id2)]
+      ;; TODO: Test that a player who's voted for themself doesn't have their vote invalidated twice
       (testing "Killing a player invalidates votes for and by them"
         (is (vote-invalidated? kill-vote-game id1)
             "Killing a player invalidates votes for them")

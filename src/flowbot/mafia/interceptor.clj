@@ -149,8 +149,8 @@
   {:name ::mentions-role
    :enter
    (fn [{:keys [::game/game event] :as ctx}]
-     (let [mentioned-id (-> event :user-mentions first :id util/parse-long)]
-       (if (some #(has-role? game mentioned-id %) roles)
+     (let [mentioned-id (some-> event :user-mentions first :id util/parse-long)]
+       (if (and mentioned-id (some #(has-role? game mentioned-id %) roles))
          ctx
          (terminate-with-reply
           ctx
