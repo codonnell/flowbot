@@ -155,6 +155,11 @@
     (let [unreg-player-id (generate ::d.p/id)]
       (is (has-not-voted? (game/vote game unreg-player-id id2) unreg-player-id)
           "Unregistered players cannot vote"))
+    (let [self-vote-kill (-> game
+                             (game/vote id1 id1)
+                             (game/kill id1))]
+      (is (= [{::d.g/voter-id id1 ::d.g/votee-id id1} {::d.g/voter-id id1 ::d.g/votee-id ::d.g/invalidated}]
+             (get-in self-vote-kill [::d.g/current-day ::d.g/votes]))))
     (let [kill-vote-game (-> game
                              (game/vote id1 id2)
                              (game/vote id2 id3)

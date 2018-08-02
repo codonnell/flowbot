@@ -138,11 +138,15 @@
                conj #::game{:voter-id voter-id :votee-id ::game/invalidated})
     game))
 
+(defn invalidate-votes-on-player-death [{{::game/keys [votes]} ::game/current-day :as game} player-id]
+  (let [dead-players-votee-id (get (votes-by-voter-id votes) player-id)]
+    (cond-> (invalidate-votes-for game player-id)
+      (not= dead-players-votee-id player-id) (invalidate-vote-by player-id))))
+
 (defn kill [game player-id]
   (-> game
       (update ::game/players dissoc player-id)
-      (invalidate-votes-for player-id)
-      (invalidate-vote-by player-id)))
+      (invalidate-votes-on-player-death player-id)))
 
 (defn revive [{::game/keys [registered-players] :as game} player-id]
   (cond-> game
