@@ -83,8 +83,6 @@
 ;;           :stage val -- optional
 ;;           :mentions-role -- optional
 ;;           :effect-fn (fn [message game] {:event val :reply val}) -- or maybe this to share computation?
-;;           :event-fn (fn [message game] {:type val}) -- optional
-;;           :reply-fn (fn [message game] "success message")})
 
 (defn command [{:keys [cmd-name role stage mentions-role effect-fn]}]
   {:name         cmd-name
@@ -95,7 +93,7 @@
                    stage         (conj (mafia.int/stage stage))
                    mentions-role (conj (mafia.int/mentions-role mentions-role)))
    :handler-fn
-   {:name (keyword "flowbot.mafia.command" (name cmd-name))
+   {:name (keyword "flowbot.mafia.command" (str (name cmd-name) "-handler"))
     :leave (fn [{::game/keys [game] :keys [event] :as ctx}]
              (let [event (assoc event
                                 :author-id (author-id event)
