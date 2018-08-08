@@ -107,16 +107,16 @@
   (= moderator-id user-id))
 
 (defmethod has-role? ::data.game/player [{::data.game/keys [registered-players]} user-id _]
-  (boolean (registered-players user-id)))
+  (contains? registered-players user-id))
 
 (defmethod has-role? ::data.game/not-player [{::data.game/keys [registered-players] :as game} user-id _]
-  (not (registered-players user-id)))
+  (not (contains? registered-players user-id)))
 
 (defmethod has-role? ::data.game/alive [{::data.game/keys [players]} user-id _]
-  (players user-id))
+  (contains? players user-id))
 
 (defmethod has-role? ::data.game/dead [{::data.game/keys [players registered-players]} user-id _]
-  (and (registered-players user-id) (not (players user-id))))
+  (and (contains? registered-players user-id) (not (contains? players user-id))))
 
 (defn role
   "Interceptor that takes a set of roles
