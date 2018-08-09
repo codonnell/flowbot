@@ -105,7 +105,7 @@
                          event (assoc ::game/update-game (game/process-event game event))))))}})
 
 (def end-registration-command
-  (command {:cmd-name  :end-registration
+  (command {:cmd-name  :end-reg
             :stage     #{::data.game/registration}
             :role      #{::data.game/moderator}
             :effect-fn (constantly {:event {::data.event/type ::data.event/end-registration}
@@ -319,9 +319,18 @@
                                         "none"
                                         (comma-separated-ping-list (keys players))))})}))
 
+(def signups-command
+  (command {:cmd-name :signups
+            :stage #{::data.game/registration ::data.game/role-distribution}
+            :effect-fn (fn [_ {::data.game/keys [registered-players]}]
+                         {:reply (str "**Signups**: "
+                                      (if (empty? registered-players)
+                                        "none"
+                                        (comma-separated-player-list registered-players (keys registered-players))))})}))
+
 (def commands {:start-game start-game-command
                :end-game end-game-command
-               :end-registration end-registration-command
+               :end-reg end-registration-command
                :start-day start-day-command
                :end-day end-day-command
                :join join-command
@@ -336,7 +345,8 @@
                :nonvoters nonvoters-command
                :ping-nonvoters ping-nonvoters-command
                :alive alive-command
-               :ping-alive ping-alive-command})
+               :ping-alive ping-alive-command
+               :signups signups-command})
 
 (def mafia-commands-command
   {:name :mafia-commands
