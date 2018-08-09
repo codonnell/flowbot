@@ -328,6 +328,15 @@
                                         "none"
                                         (comma-separated-player-list registered-players (keys registered-players))))})}))
 
+(def ping-signups-command
+  (command {:cmd-name :ping-signups
+            :stage #{::data.game/registration ::data.game/role-distribution}
+            :effect-fn (fn [_ {::data.game/keys [registered-players]}]
+                         {:reply (str "**Signups**: "
+                                      (if (empty? registered-players)
+                                        "none"
+                                        (comma-separated-ping-list (keys registered-players))))})}))
+
 (def commands {:start-game start-game-command
                :end-game end-game-command
                :end-reg end-registration-command
@@ -346,7 +355,8 @@
                :ping-nonvoters ping-nonvoters-command
                :alive alive-command
                :ping-alive ping-alive-command
-               :signups signups-command})
+               :signups signups-command
+               :ping-signups ping-signups-command})
 
 (def mafia-commands-command
   {:name :mafia-commands
