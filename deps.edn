@@ -1,9 +1,9 @@
 {:paths ["src" "resources"]
  :deps
- {org.clojure/clojure              {:mvn/version "1.10.0-alpha6"}
+ {org.clojure/clojure              {:mvn/version "1.10.0"}
   manifold                         {:mvn/version "0.1.6"}
-  discord.clj                      {:git/url "git@github.com:codonnell/discord.clj.git"
-                                    :sha "48fa698a2b4078296cf7a989a8936ff1562941e0"}
+  harmony                          {:git/url "git@github.com:codonnell/harmony.git"
+                                    :sha     "9ee87522bcba73a01e6d353c0e73b994c6cbcd6b"}
   integrant                        {:mvn/version "0.7.0-alpha2"}
   com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
   clojure.java-time                {:mvn/version "0.3.1"}

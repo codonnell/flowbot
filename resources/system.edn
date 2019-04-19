@@ -13,10 +13,7 @@
  {:token #dyn/prop FLOWBOT_TOKEN
   :name #dyn/prop [FLOWBOT_NAME "flowbot"]
   :prefix #dyn/prop [FLOWBOT_PREFIX "!"]
-  :owner-id #dyn/prop FLOWBOT_OWNER_ID}
-
- :discord/message-dispatcher
- {:bot #ig/ref :discord/bot
+  :owner-id #dyn/prop FLOWBOT_OWNER_ID
   :event-bus #ig/ref :event-bus}
 
  :discord/registrar

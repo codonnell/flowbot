@@ -16,11 +16,11 @@
 (defn author-id [message]
   (util/parse-long (get-in message [:author :id])))
 
-(defn channel-id [message]
-  (util/parse-long (get-in message [:channel :id])))
+(defn channel-id [{:keys [channel-id]}]
+  (util/parse-long channel-id))
 
 (defn mention-id [message]
-  (some-> message :user-mentions first :id util/parse-long))
+  (some-> message :mentions first :id util/parse-long))
 
 (def start-game-command
   {:name :start-game

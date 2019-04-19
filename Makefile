@@ -12,7 +12,7 @@ clean:
 	rm flowbot.jar
 
 uberjar:
-	clojure -A\:pack mach.pack.alpha.capsule flowbot.jar --application-id flowbot --application-version "$(git describe)" -m flowbot.core
+	clojure -A\:pack mach.pack.alpha.capsule flowbot.jar --application-id flowbot --application-version "$(git describe --tags)" -m flowbot.core
 
 migrate:
 	source flowbot.env && source flowbot_secret.env && clojure -m flowbot.migrate.up

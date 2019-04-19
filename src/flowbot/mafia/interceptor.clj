@@ -12,8 +12,8 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]))
 
-(defn- msg->channel-id [msg]
-  (Long/parseLong (get-in msg [:channel :id])))
+(defn- msg->channel-id [{:keys [channel-id]}]
+  (Long/parseLong channel-id))
 
 (defn- db-event->event [db-event]
   (-> db-event
@@ -149,7 +149,7 @@
   {:name ::mentions-role
    :enter
    (fn [{:keys [::game/game event] :as ctx}]
-     (let [mentioned-id (some-> event :user-mentions first :id util/parse-long)]
+     (let [mentioned-id (some-> event :mentions first :id util/parse-long)]
        (if (and mentioned-id (some #(has-role? game mentioned-id %) roles))
          ctx
          (terminate-with-reply

@@ -8,7 +8,6 @@
             flowbot.event.bus
             flowbot.discord.bot
             flowbot.discord.registrar
-            flowbot.discord.message-dispatcher
             flowbot.mafia.command
             flowbot.command.handler
             flowbot.command.custom)

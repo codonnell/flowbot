@@ -8,7 +8,7 @@
             [clojure.string :as str]
             [flowbot.data.postgres :as pg]
             [flowbot.util :as util]
-            [flowbot.discord.message-dispatcher :as msg.dispatch]
+            [flowbot.discord.bot :as discord.bot]
             [flowbot.command.data.custom :as d.custom]
             [flowbot.registrar :as reg]
             [flowbot.interceptor.registrar :as int.reg]
@@ -98,7 +98,7 @@
    :enter (fn [{::pg/keys [conn] :keys [event] :as ctx}]
             (if-let [command (d.custom/get-custom-command-by-name
                               conn
-                              (msg.dispatch/command-name (:content event) prefix))]
+                              (discord.bot/command-name (:content event) prefix))]
               (assoc ctx ::d.custom/command command)
               ctx))})
 
