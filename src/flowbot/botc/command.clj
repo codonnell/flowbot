@@ -181,16 +181,31 @@
                                                  :votee-id mention-id}
                             :reply "Your vote has been registered."}))}))
 
+(defn format-votee [registered-players votee-id]
+  (get-in registered-players [votee-id ::data.player/username] "moderator"))
+
 (def kill-command
   (command {:cmd-name :kill
             :stage #{::data.game/day ::data.game/night}
             :role #{::data.game/moderator}
             :mentions-role #{::data.game/alive}
-            :effect-fn (fn [{:keys [mention-id]} {::data.game/keys [players]}]
+            :effect-fn (fn [{:keys [mention-id]} {::data.game/keys [registered-players]}]
                          {:event #::data.event{:type ::data.event/kill
                                                :player-id mention-id}
-                          :reply (str (get-in players [mention-id ::data.player/username])
+                          :reply (str (format-votee registered-players mention-id)
                                       " has met an unforunate demise.")})}))
+
+(def execute-command
+  (command {:cmd-name :execute
+            :stage #{::data.game/day}
+            :role #{::data.game/moderator}
+            :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
+                         (if-let [dead-id (game/who-dies game)]
+                           {:event #::data.event{:type ::data.event/kill
+                                                 :player-id dead-id}
+                            :reply (str (format-votee registered-players dead-id)
+                                        " has been executed.")}
+                           {:reply "No one has been executed"}))}))
 
 (def revive-command
   (command {:cmd-name :revive
@@ -209,9 +224,6 @@
 (defn format-vote-count [num-players [target n]]
   (cond-> (str target ": " n)
     (> n (quot num-players 2)) bold))
-
-(defn format-votee [registered-players votee-id]
-  (get-in registered-players [votee-id ::data.player/username] "moderator"))
 
 (defn format-votes-by-votee [{::data.game/keys [registered-players players]
                               {::data.game/keys [votes]} ::data.game/current-day}]
@@ -408,6 +420,7 @@
                :nominate nominate-command
                :vote vote-command
                :kill kill-command
+               :execute execute-command
                :revive revive-command
                :nominations nominations-command
                :vote-count vote-count-command
