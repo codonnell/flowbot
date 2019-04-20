@@ -32,3 +32,21 @@
 
 (defn parse-long [s]
   (Long/parseLong s))
+
+(defn or-join [xs]
+  (case (count xs)
+    0 ""
+    1 (first xs)
+    2 (apply format "%s or %s" xs)
+    (let [first-xs (butlast xs)
+          last-x (last xs)]
+      (format "%s, or %s" (str/join ", " first-xs) last-x))))
+
+(defn and-join [xs]
+  (case (count xs)
+    0 ""
+    1 (first xs)
+    2 (apply format "%s and %s" xs)
+    (let [first-xs (butlast xs)
+          last-x (last xs)]
+      (format "%s, and %s" (str/join ", " first-xs) last-x))))

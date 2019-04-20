@@ -1,9 +1,9 @@
-(ns flowbot.mafia.command
-  (:require [flowbot.mafia.interceptor :as mafia.int]
-            [flowbot.mafia.data.game :as data.game]
-            [flowbot.mafia.data.event :as data.event]
-            [flowbot.mafia.data.player :as data.player]
-            [flowbot.mafia.game :as game]
+(ns flowbot.botc.command
+  (:require [flowbot.botc.interceptor :as botc.int]
+            [flowbot.botc.data.game :as data.game]
+            [flowbot.botc.data.event :as data.event]
+            [flowbot.botc.data.player :as data.player]
+            [flowbot.botc.game :as game]
             [flowbot.data.postgres :as pg]
             [flowbot.plugin :as plugin]
             [flowbot.registrar :as reg]
@@ -12,6 +12,7 @@
             [flowbot.util :as util]
             [net.cgrand.xforms :as x]
             [integrant.core :as ig]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]))
 
 (defn author-id [message]
@@ -25,7 +26,7 @@
 
 (def start-game-command
   {:name :start-game
-   :interceptors [discord.action/reply-interceptor ::pg/inject-conn mafia.int/no-game-running]
+   :interceptors [discord.action/reply-interceptor ::pg/inject-conn botc.int/no-game-running]
    :handler-fn
    (int.reg/interceptor
     {:name ::start-game-handler
@@ -40,8 +41,8 @@
    :f (fn [{::pg/keys [conn] ::data.game/keys [moderator-id channel-id]}]
         (try
           (let [send-message (:f (reg/get :effect ::discord.action/send-message))]
-            (data.game/insert-mafia-game! conn {:moderator-id moderator-id :channel-id channel-id})
-            (send-message [channel-id "A mafia game has started! Type !join to join."]))
+            (data.game/insert-botc-game! conn {:moderator-id moderator-id :channel-id channel-id})
+            (send-message [channel-id "A blood on the clocktower game has started! Type !join to join."]))
           (catch Throwable e
             (log/error e))))})
 
@@ -49,10 +50,10 @@
   {:name :end-game
    :interceptors [discord.action/reply-interceptor
                   ::pg/inject-conn
-                  mafia.int/current-game-lens
+                  botc.int/current-game-lens
                   (int.reg/or-auth
                    discord.action/owner-role
-                   (mafia.int/role #{::data.game/moderator}))]
+                   (botc.int/role #{::data.game/moderator}))]
    :handler-fn
    (int.reg/interceptor
     {:name ::end-game-handler
@@ -67,15 +68,15 @@
    :f (fn [{::data.game/keys [id channel-id] ::pg/keys [conn]}]
         (try
           (let [send-message (:f (reg/get :effect ::discord.action/send-message))]
-            (data.game/finish-mafia-game-by-id! conn id)
-            (send-message [channel-id "The mafia game has finished."]))
+            (data.game/finish-botc-game-by-id! conn id)
+            (send-message [channel-id "The blood on the clocktower game has finished."]))
           (catch Throwable e
             (log/error e))))})
 
 ;; Most of these are just boilerplate around:
 ;; * command name
 ;; * auth interceptors
-;; * mafia event using data from message and game
+;; * botc event using data from message and game
 ;; * success message string from message and game
 ;; This is for the 80% case--don't try to make it too general when it doesn't have to be
 
@@ -85,21 +86,22 @@
 ;;           :mentions-role -- optional
 ;;           :effect-fn (fn [message game] {:event val :reply val}) -- or maybe this to share computation?
 
-(defn command [{:keys [cmd-name role stage mentions-role effect-fn]}]
+(defn command [{:keys [cmd-name role stage mentions-role effect-fn allow-dm?]}]
   {:name         cmd-name
    :interceptors (cond-> [discord.action/reply-interceptor
-                          ::pg/inject-conn
-                          mafia.int/current-game-lens]
-                   role          (conj (mafia.int/role role))
-                   stage         (conj (mafia.int/stage stage))
-                   mentions-role (conj (mafia.int/mentions-role mentions-role)))
+                          ::pg/inject-conn]
+                   allow-dm?     (conj botc.int/dm-inject-channel-id)
+                   true          (conj botc.int/current-game-lens)
+                   role          (conj (botc.int/role role))
+                   stage         (conj (botc.int/stage stage))
+                   mentions-role (conj (botc.int/mentions-role mentions-role)))
    :handler-fn
-   {:name (keyword "flowbot.mafia.command" (str (name cmd-name) "-handler"))
+   {:name  (keyword "flowbot.botc.command" (str (name cmd-name) "-handler"))
     :leave (fn [{::game/keys [game] :keys [event] :as ctx}]
-             (let [event (assoc event
-                                :author-id (author-id event)
-                                :channel-id (channel-id event)
-                                :mention-id (mention-id event))
+             (let [event                 (assoc event
+                                                :author-id (author-id event)
+                                                :channel-id (channel-id event)
+                                                :mention-id (mention-id event))
                    {:keys [event reply]} (effect-fn event game)]
                (update ctx :effects merge
                        (cond-> {::discord.action/reply {:content reply}}
@@ -110,7 +112,7 @@
             :stage     #{::data.game/registration}
             :role      #{::data.game/moderator}
             :effect-fn (constantly {:event {::data.event/type ::data.event/end-registration}
-                                    :reply "Mafia registration has been closed."})}))
+                                    :reply "Blood on the clocktower registration has been closed."})}))
 
 (def join-command
   (command {:cmd-name :join
@@ -145,44 +147,39 @@
             :effect-fn (constantly {:event #::data.event{:type ::data.event/end-day}
                                     :reply "The sun disappears beyond the horizon as night begins."})}))
 
+(def nominate-command
+  (command {:cmd-name :nominate
+            :stage #{::data.game/day}
+            :role #{::data.game/alive}
+            :mentions-role #{::data.game/player ::data.game/moderator}
+            :effect-fn (fn [{:keys [author-id mention-id]} game]
+                         (cond
+                           (not (game/can-nominate? game author-id))
+                           {:reply "You've already nominated someone today."}
+                           (not (game/can-be-nominated? game mention-id))
+                           {:reply "That player has already been nominated today"}
+                           :else
+                           {:event #::data.event{:type ::data.event/nominate
+                                                 :nominator-id author-id
+                                                 :nominated-id mention-id}
+                            :reply "Your nomination has been registered."}))}))
+
 (def vote-command
   (command {:cmd-name :vote
             :stage #{::data.game/day}
-            :role #{::data.game/alive}
-            :mentions-role #{::data.game/alive}
-            :effect-fn (fn [{:keys [author-id mention-id]} _]
-                         {:event #::data.event{:type ::data.event/vote
-                                               :voter-id author-id
-                                               :votee-id mention-id}
-                          :reply "Your vote has been registered."})}))
-
-(def unvote-command
-  (command {:cmd-name :unvote
-            :stage #{::data.game/day}
-            :role #{::data.game/alive}
-            :effect-fn (fn [{:keys [author-id mention-id]} _]
-                         {:event #::data.event{:type ::data.event/unvote
-                                               :voter-id author-id}
-                          :reply "Your vote has been removed."})}))
-
-(defn format-my-vote [{::data.game/keys [players]} votee]
-  (case votee
-    ::data.game/no-one "You voted for no one."
-    ::data.game/invalidated "Your vote was invalidated."
-    nil "You have not voted yet."
-    (str "You voted for " (get-in players [votee ::data.player/username]) ".")))
-
-(def my-vote-command
-  (command {:cmd-name :my-vote
-            :stage #{::data.game/day}
-            :role #{::data.game/alive}
-            :effect-fn (fn [{:keys [author-id]} game]
-                         (let [votee (-> game
-                                         ::data.game/current-day
-                                         ::data.game/votes
-                                         game/votes-by-voter-id
-                                         (get author-id))]
-                           {:reply (format-my-vote game votee)}))}))
+            :role #{::data.game/player}
+            :mentions-role #{::data.game/nominated}
+            :effect-fn (fn [{:keys [author-id mention-id]} game]
+                         (cond
+                           (not (game/can-vote? game author-id))
+                           {:reply "You cannot vote. You're dead and already used your dead vote."}
+                           (game/voted-for? game author-id mention-id)
+                           {:reply "You already voted for them today."}
+                           :else
+                           {:event #::data.event{:type ::data.event/vote
+                                                 :voter-id author-id
+                                                 :votee-id mention-id}
+                            :reply "Your vote has been registered."}))}))
 
 (def kill-command
   (command {:cmd-name :kill
@@ -206,24 +203,24 @@
                           :reply (str (get-in registered-players [mention-id ::data.player/username])
                                       " has been brought back to life. Hooray!")})}))
 
-(defn format-vote-count [[target n]]
-  (str target ": " n))
+(defn- bold [s]
+  (str "**" s "**"))
+
+(defn format-vote-count [num-players [target n]]
+  (cond-> (str target ": " n)
+    (> n (quot num-players 2)) bold))
 
 (defn format-votee [registered-players votee-id]
-  (case votee-id
-    ::data.game/no-one "No one"
-    ::data.game/invalidated "Invalidated"
-    nil "Not voted"
-    (get-in registered-players [votee-id ::data.player/username])))
+  (get-in registered-players [votee-id ::data.player/username] "moderator"))
 
-(defn format-votes-by-votee [{::data.game/keys [registered-players]
+(defn format-votes-by-votee [{::data.game/keys [registered-players players]
                               {::data.game/keys [votes]} ::data.game/current-day}]
   (if (empty? votes)
     "**No Votes Recorded**"
     (str "**Votes**\n"
          (x/str (comp (x/sort-by second (comp - compare))
                       (map (fn [[votee-id n]] [(format-votee registered-players votee-id) n]))
-                      (map format-vote-count)
+                      (map (partial format-vote-count (count players)))
                       (interpose "\n"))
                 (game/votes-by-votee-id votes)))))
 
@@ -234,23 +231,13 @@
             :effect-fn (fn [_ game]
                          {:reply (format-votes-by-votee game)})}))
 
-(defn format-vote-log-entry [registered-players {::data.game/keys [voter-id votee-id]
-                                                 ::keys [final?]}]
+(defn format-vote-log-entry [registered-players {::data.game/keys [voter-id votee-id invalidated?]}]
   (let [voter-name (get-in registered-players [voter-id ::data.player/username])]
     (let [message
-          (case votee-id
-            ::data.game/no-one (str "_" voter-name "_ voted for no one")
-            ::data.game/invalidated (str "_" voter-name "_'s vote was invalidated")
-            (str "_" voter-name "_ voted for _" (get-in registered-players [votee-id ::data.player/username]) "_"))]
-      (if final? (str "**" message "**") message))))
-
-(defn mark-final-votes [votes]
-  (::votes (reduce (fn [{::keys [final-voter-ids votes]} {::data.game/keys [voter-id] :as vote}]
-                     {::final-voter-ids (conj final-voter-ids voter-id)
-                      ::votes (conj votes (if (final-voter-ids voter-id)
-                                            vote (assoc vote ::final? true)))})
-                   {::final-voter-ids #{} ::votes '()}
-                   (reverse votes))))
+          (format "_%s_ voted for _%s_"
+                  voter-name
+                  (format-votee registered-players votee-id))]
+      (if invalidated? (str "~~" message "~~") message))))
 
 (defn format-vote-log [{::data.game/keys [registered-players]
                         {::data.game/keys [votes]} ::data.game/current-day}]
@@ -259,7 +246,7 @@
     (str "**Vote Log**\n"
          (x/str (comp (map (partial format-vote-log-entry registered-players))
                       (interpose "\n"))
-                (mark-final-votes votes)))))
+                votes))))
 
 (def vote-log-command
   (command {:cmd-name :vote-log
@@ -268,8 +255,18 @@
             :effect-fn (fn [_ game]
                          {:reply (format-vote-log game)})}))
 
+(def who-dies-command
+  (command {:cmd-name :who-dies
+            :stage #{::data.game/day ::data.game/night}
+            :role #{::data.game/player ::data.game/moderator}
+            :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
+                         {:reply (if-let [dead-id (game/who-dies game)]
+                                   (format "_%s_ will be executed."
+                                           (format-votee registered-players dead-id))
+                                   "No one will be executed.")})}))
+
 (defn comma-separated-player-list [registered-players ids]
-  (x/str (comp (map #(get-in registered-players [% ::data.player/username]))
+  (x/str (comp (map #(get-in registered-players [% ::data.player/username] "moderator"))
                (interpose ", "))
          ids))
 
@@ -277,6 +274,17 @@
   (x/str (comp (map #(str "<@" % ">"))
                (interpose ", "))
          ids))
+
+(def nominations-command
+  (command {:cmd-name :nominations
+            :stage #{::data.game/day}
+            :role #{::data.game/player ::data.game/moderator}
+            :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
+                         (let [nominated-ids (-> game ::data.game/current-day ::data.game/nominations keys)]
+                           {:reply (if nominated-ids
+                                     (str "**Nominations:** "
+                                          (comma-separated-player-list registered-players nominated-ids))
+                                     "**No Nominations Recorded**")}))}))
 
 (def nonvoters-command
   (command {:cmd-name :nonvoters
@@ -338,6 +346,58 @@
                                         "none"
                                         (comma-separated-ping-list (keys registered-players))))})}))
 
+(def players-command
+  (command {:cmd-name :players
+            :stage #{::data.game/role-distribution ::data.game/day ::data.game/night ::data.game/finished}
+            :allow-dm? true
+            :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
+                         (log/warn {:game game})
+                         {:reply (str "**Players**"
+                                      (if (seq registered-players)
+                                        (x/str (map (fn [[_ {::data.player/keys [index username]}]]
+                                                      (format "\n%d. %s" index username)))
+                                               (sort-by (comp ::data.player/index val) registered-players))
+                                        ": none"))})}))
+
+(def dm-command
+  {:name :dm
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  botc.int/dm-inject-channel-id
+                  botc.int/current-game-lens
+                  (botc.int/role #{::data.game/player})
+                  (botc.int/stage #{::data.game/day})]
+   :handler-fn
+   {:name ::dm-handler
+    :leave (fn [{::game/keys [game] :keys [event] :as ctx}]
+             (let [[_ recipient-index message] (str/split (:content event) #"\s+" 3)
+                   author-username (get-in game [::data.game/registered-players (author-id event) ::data.player/username])]
+               (update ctx :effects merge
+                       (if-let [recipient (try (and recipient-index
+                                                    message
+                                                    (some (fn [[_ {::data.player/keys [index] :as player}]]
+                                                            (when (= (util/parse-long recipient-index) index)
+                                                              player))
+                                                          (::data.game/registered-players game)))
+                                               (catch Throwable _ nil))]
+                         {::discord.action/reply {:content (format "Message sent to %s"
+                                                                   (::data.player/username recipient))}
+                          ::discord.action/send-messages
+                          [{:channel-id (::botc.int/channel-id event)
+                            :content (format "**DM** %s -> %s"
+                                             author-username
+                                             (::data.player/username recipient))}]
+
+                          ::discord.action/send-dms [{:user-id (::data.player/id recipient)
+                                                      :content (format "Message from %s: %s" author-username message)}
+                                                     {:user-id (::data.game/moderator-id game)
+                                                      :content (format "**DM** %s -> %s: %s"
+                                                                       author-username
+                                                                       (::data.player/username recipient)
+                                                                       message)}]}
+                         {::discord.action/reply {:content "Usage: !dm player-number message\nType !players in the game channel to see all player numbers."}}))))}})
+
+
 (def commands {:start-game start-game-command
                :end-game end-game-command
                :end-reg end-registration-command
@@ -345,26 +405,29 @@
                :end-day end-day-command
                :join join-command
                :leave leave-command
+               :nominate nominate-command
                :vote vote-command
-               :unvote unvote-command
-               :my-vote my-vote-command
                :kill kill-command
                :revive revive-command
+               :nominations nominations-command
                :vote-count vote-count-command
                :vote-log vote-log-command
+               :who-dies who-dies-command
                :nonvoters nonvoters-command
                :ping-nonvoters ping-nonvoters-command
                :alive alive-command
                :ping-alive ping-alive-command
                :signups signups-command
-               :ping-signups ping-signups-command})
+               :ping-signups ping-signups-command
+               :players players-command
+               :dm dm-command})
 
-(def mafia-commands-command
-  {:name :mafia-commands
+(def botc-commands-command
+  {:name :botc-commands
    :interceptors [discord.action/reply-interceptor]
    :handler-fn
    (int.reg/interceptor
-    {:name ::mafia-commands-handler
+    {:name ::botc-commands-handler
      :leave (fn [ctx]
               (update ctx :effects assoc
                       ::discord.action/reply
@@ -376,12 +439,12 @@
 
 (def registry {:effect {::start-game start-game-effect
                         ::end-game end-game-effect}
-               :command (assoc commands :mafia-commands mafia-commands-command)})
+               :command (assoc commands :botc-commands botc-commands-command)})
 
-(defmethod plugin/enable "mafia" [_]
+(defmethod plugin/enable "botc" [_]
   (reg/add-registry! registry)
-  {::discord.action/reply {:content "Mafia plugin enabled."}})
+  {::discord.action/reply {:content "Blood on the clocktower plugin enabled."}})
 
-(defmethod plugin/disable "mafia" [_]
+(defmethod plugin/disable "botc" [_]
   (reg/remove-registry! registry)
-  {::discord.action/reply {:content "Mafia plugin disabled."}})
+  {::discord.action/reply {:content "Blood on the clocktower plugin disabled."}})

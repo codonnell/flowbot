@@ -4,10 +4,26 @@
             [io.pedestal.interceptor.chain :as int.chain]
             [flowbot.interceptor.registrar :as int.reg]
             [flowbot.config :as config]
-            [flowbot.util :as util]))
+            [flowbot.util :as util]
+            [clojure.tools.logging :as log]))
+
+(defn send-messages!
+  [rest-client & messages]
+  (log/warn {:messages messages})
+  (doseq [{:keys [channel-id content]} messages]
+    (rest/create-message! rest-client channel-id content)))
+
+(defn send-dms!
+  [rest-client & dms]
+  (log/warn {:dms dms})
+  (doseq [{:keys [user-id content]} dms]
+    (rest/create-dm! rest-client user-id content)))
 
 (def http-actions*
-  {::send-message rest/create-message!})
+  {::send-message rest/create-message!
+   ::send-dm rest/create-dm!
+   ::send-messages send-messages!
+   ::send-dms send-dms!})
 
 (defn http-actions
   "Given a discord bot record, returns a map of http actions. In clj.discord, each

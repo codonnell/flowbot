@@ -3,7 +3,7 @@
  {org.clojure/clojure              {:mvn/version "1.10.0"}
   manifold                         {:mvn/version "0.1.6"}
   harmony                          {:git/url "git@github.com:codonnell/harmony.git"
-                                    :sha     "9ee87522bcba73a01e6d353c0e73b994c6cbcd6b"}
+                                    :sha     "07d24f693641d7b0c4a8138b2cc80a0e779711cc"}
   integrant                        {:mvn/version "0.7.0-alpha2"}
   com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
   clojure.java-time                {:mvn/version "0.3.1"}
@@ -23,8 +23,8 @@
   {:extra-paths ["dev" "test"]
    :extra-deps
    {integrant/repl         {:mvn/version "0.3.0"}
-    cider/cider-nrepl      {:mvn/version "0.18.0-SNAPSHOT"}
-    refactor-nrepl         {:mvn/version "2.3.1"}
+    cider/cider-nrepl      {:mvn/version "0.21.1"}
+    refactor-nrepl         {:mvn/version "2.4.0"}
     org.clojure/test.check {:mvn/version "0.9.0"}}}
 
   :test

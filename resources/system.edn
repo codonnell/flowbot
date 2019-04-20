@@ -25,7 +25,7 @@
   :_conn #ig/ref :postgres/connection
   :_registrar #ig/ref :discord/registrar}
 
- :mafia/command
+ :plugin/manager
  {:_reg #ig/ref :discord/registrar}
 
  :command/custom

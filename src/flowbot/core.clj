@@ -8,9 +8,12 @@
             flowbot.event.bus
             flowbot.discord.bot
             flowbot.discord.registrar
-            flowbot.mafia.command
+            flowbot.plugin
             flowbot.command.handler
-            flowbot.command.custom)
+            flowbot.command.custom
+            ;; For plugin multimethods
+            flowbot.mafia.command
+            flowbot.botc.command)
   (:gen-class))
 
 (defn -main
