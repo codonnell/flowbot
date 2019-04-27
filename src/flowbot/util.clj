@@ -50,3 +50,6 @@
     (let [first-xs (butlast xs)
           last-x (last xs)]
       (format "%s, and %s" (str/join ", " first-xs) last-x))))
+
+(defn stringify-kw [kw]
+  (-> kw name (str/replace "-" " ")))

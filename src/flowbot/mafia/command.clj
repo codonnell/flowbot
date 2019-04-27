@@ -138,11 +138,11 @@
             :effect-fn (constantly {:event #::data.event{:type ::data.event/start-day}
                                     :reply "The sun crests the horizon as a new day begins."})}))
 
-(def end-day-command
-  (command {:cmd-name :end-day
+(def start-night-command
+  (command {:cmd-name :start-night
             :stage #{::data.game/day}
             :role #{::data.game/moderator}
-            :effect-fn (constantly {:event #::data.event{:type ::data.event/end-day}
+            :effect-fn (constantly {:event #::data.event{:type ::data.event/start-night}
                                     :reply "The sun disappears beyond the horizon as night begins."})}))
 
 (def vote-command
@@ -342,7 +342,7 @@
                :end-game end-game-command
                :end-reg end-registration-command
                :start-day start-day-command
-               :end-day end-day-command
+               :start-night start-night-command
                :join join-command
                :leave leave-command
                :vote vote-command

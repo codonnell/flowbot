@@ -68,7 +68,7 @@
         (is (= day-game (game/start-day day-game)))))
     (testing "Start day adds current-day and changes stage to day when it's night or role distribution stage"
       (let [rd-stage (-> game game/end-registration)
-            night-stage (-> game game/end-registration game/start-day game/end-day)
+            night-stage (-> game game/end-registration game/start-day game/start-night)
             changes-to-day? (fn [game]
                               (is (not (::d.g/current-day game)))
                               (is (not= ::d.g/day (::d.g/stage game)))
@@ -78,19 +78,19 @@
         (changes-to-day? rd-stage)
         (changes-to-day? night-stage)))))
 
-(deftest end-day
+(deftest start-night
   (let [game (initialized-game)]
     (testing "End day does nothing unless it's day stage"
-      (is (= game (game/end-day game)))
+      (is (= game (game/start-night game)))
       (let [rd-stage (-> game game/end-registration)
-            night-stage (-> game game/end-registration game/start-day game/end-day)]
-        (is (= rd-stage (game/end-day rd-stage)))
-        (is (= night-stage (game/end-day night-stage)))))
+            night-stage (-> game game/end-registration game/start-day game/start-night)]
+        (is (= rd-stage (game/start-night rd-stage)))
+        (is (= night-stage (game/start-night night-stage)))))
     (testing "End day adds current-day to the end of past-days, removes current-day, and changes stage to night."
       (let [day-stage (-> game game/end-registration game/start-day)]
         (is (::d.g/current-day day-stage))
         (is (= ::d.g/day (::d.g/stage day-stage)))
-        (let [night-stage (game/end-day day-stage)]
+        (let [night-stage (game/start-night day-stage)]
           (is (not (::d.g/current-day night-stage)))
           (is (= ::d.g/night (::d.g/stage night-stage)))
           (is (= (::d.g/current-day day-stage) (peek (::d.g/past-days night-stage)))))))))
@@ -180,7 +180,7 @@
 (deftest invalidate-votes-for
   (let [[{id1 ::d.p/id} {id2 ::d.p/id} {id3 ::d.p/id} :as players] (gen-players 3)
         game (game/vote (started-with-players players) id1 id2)
-        night-game (game/end-day game)]
+        night-game (game/start-night game)]
     (is (vote-invalidated? (game/invalidate-votes-for game id2) id1)
         "Votes for a player are invalidated")
     (testing "Multiple votes for a player are all invalidated"
@@ -196,7 +196,7 @@
 (deftest invalidate-vote-by
   (let [[{id1 ::d.p/id} {id2 ::d.p/id} {id3 ::d.p/id} :as players] (gen-players 3)
         game (game/vote (started-with-players players) id1 id2)
-        night-game (game/end-day game)]
+        night-game (game/start-night game)]
     (is (vote-invalidated? (game/invalidate-vote-by game id1) id1)
         "Invalidating the vote of a player who has voted succeeds")
     (is (has-not-voted? (game/invalidate-vote-by game id2) id2)
@@ -229,7 +229,7 @@
                  (game/vote id1 id2)
                  (game/vote id3 id1))
         day1-totals {id1 1 id2 1}
-        night-game (game/end-day game)
+        night-game (game/start-night game)
         day2-game (game/start-day night-game)]
     (is (= day1-totals (game/today-totals game))
         "Today votes counts same day votes")
@@ -255,5 +255,5 @@
         "Players that vote for no one are not counted as nonvoters")
     (is (= #{} (-> game (game/vote id2 id1) (game/invalidate-vote-by id2) game/nonvoters))
         "Players whose votes have been invalidated are not counted as nonvoters")
-    (is (nil? (-> game game/end-day game/nonvoters))
+    (is (nil? (-> game game/start-night game/nonvoters))
         "Nonvoters is nil at night")))

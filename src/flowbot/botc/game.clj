@@ -22,47 +22,58 @@
 
 (def started? (complement unstarted?))
 
-(defn end-registration [{::game/keys [registered-players] :as game}]
-  (let [players (into {}
-                      (map-indexed (fn [idx [id player]]
-                                     [id (assoc player ::player/index idx)]))
-                      (sort-by (comp str/lower-case ::player/username val) registered-players))]
-    (assoc game
-           ::game/stage ::game/role-distribution
-           ::game/registered-players players
-           ::game/players players
-           ::game/dead-votes-used #{})))
-
-(defn- registration-open? [{:keys [::game/stage]}]
-  (= ::game/registration stage))
-
-(defn join-game [game {::player/keys [id] :as player}]
-  (cond-> game
-    (registration-open? game) (update ::game/registered-players assoc id player)))
-
-(defn leave-game [game player-id]
-  (cond-> game
-    (registration-open? game) (update ::game/registered-players dissoc player-id)))
-
 (defn day? [{::game/keys [stage]}]
   (= ::game/day stage))
 
 (defn night? [{::game/keys [stage]}]
   (= ::game/night stage))
 
+(defn end-registration [{::game/keys [registered-players] :as game}]
+  (assoc game
+         ::game/stage ::game/role-distribution
+         ::game/players registered-players
+         ::game/dead-votes-used #{}))
+
+(defn- registration-open? [{:keys [::game/stage]}]
+  (= ::game/registration stage))
+
+(defn join-game [{::game/keys [stage registered-players] :as game} {::player/keys [id] :as player}]
+  (let [past-registration? (not= ::game/registration stage)
+        new-player (assoc player ::player/index (count registered-players))]
+    (cond-> game
+      true (update ::game/registered-players assoc id new-player)
+      past-registration? (update ::game/players assoc id new-player))))
+
+(defn invalidate-votes-for-and-by-player [game player-id]
+  (cond-> game
+    (day? game)
+    (update-in [::game/current-day ::game/votes]
+               #(mapv (fn [{::game/keys [voter-id votee-id] :as vote}]
+                        (cond-> vote
+                          (or (= player-id voter-id)
+                              (= player-id votee-id))
+                          (assoc ::game/invalidated? true)))
+                      %))))
+
+(defn leave-game [{::game/keys [stage current-day] :as game} player-id]
+  (cond-> game
+    true (update ::game/registered-players dissoc player-id)
+    (not= ::game/registration stage) (update ::game/players dissoc player-id)
+    true (invalidate-votes-for-and-by-player player-id)))
+
 (defn start-day [{::game/keys [past-days stage] :as game}]
-  (if (#{::game/role-distribution ::game/night} stage)
+  (if (night? game)
     (assoc game
            ::game/current-day {::game/votes []}
            ::game/stage ::game/day)
     game))
 
-(defn end-day [{::game/keys [current-day] :as game}]
-  (if (day? game)
-    (-> game
-        (assoc ::game/stage ::game/night)
-        (update ::game/past-days conj current-day)
-        (dissoc ::game/current-day))
+(defn start-night [{::game/keys [current-day stage] :as game}]
+  (if (#{::game/role-distribution ::game/day} stage)
+    (cond-> game
+      true (assoc ::game/stage ::game/night)
+      current-day (update ::game/past-days conj current-day)
+      true (dissoc ::game/current-day))
     game))
 
 (defn- moderator? [{::game/keys [moderator-id]} id]
@@ -160,21 +171,10 @@
   (when (day? game)
     (set/difference (set (keys players)) (into #{} (map ::game/voter-id) votes))))
 
-(defn invalidate-votes-on-player-death [game player-id]
-  (cond-> game
-    (day? game)
-    (update-in [::game/current-day ::game/votes]
-               #(mapv (fn [{::game/keys [voter-id votee-id] :as vote}]
-                        (cond-> vote
-                          (or (= player-id voter-id)
-                              (= player-id votee-id))
-                          (assoc ::game/invalidated? true)))
-                      %))))
-
 (defn kill [game player-id]
   (-> game
       (update ::game/players dissoc player-id)
-      (invalidate-votes-on-player-death player-id)))
+      (invalidate-votes-for-and-by-player player-id)))
 
 (defn revive [{::game/keys [registered-players] :as game} player-id]
   (cond-> game
@@ -223,7 +223,11 @@
 
 (defmethod process-event* ::event/end-day
   [game _]
-  (end-day game))
+  (start-night game))
+
+(defmethod process-event* ::event/start-night
+  [game _]
+  (start-night game))
 
 (defmethod process-event* ::event/kill
   [game {::event/keys [player-id]}]

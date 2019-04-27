@@ -25,6 +25,7 @@
   (-> (initialized-game)
       (reg-players players)
       game/end-registration
+      game/start-night
       game/start-day))
 
 (deftest init-game
@@ -44,21 +45,41 @@
     (is (not (game/unstarted? (assoc game ::d.g/stage ::d.g/day))))
     (is (not (game/unstarted? (assoc game ::d.g/stage ::d.g/night))))))
 
-(deftest join-game
+(deftest join-and-leave-game
   (let [game (initialized-game)
-        player (generate ::d.p/player)
-        join-game-success? (fn [game {::d.p/keys [id] :as player}]
-                             ((::d.g/registered-players (game/join-game game player)) id))]
-    (is (join-game-success? game player))
-    (is (not (join-game-success? (game/end-registration game) player)))))
+        {::d.p/keys [id] :as player} (generate ::d.p/player)
+        joined-game (game/join-game game player)
+        left-game (game/leave-game joined-game id)]
+    (is (contains? (::d.g/registered-players joined-game) id))
+    (is (not (contains? (::d.g/registered-players left-game) id)))))
 
-(deftest leave-game
-  (let [{::d.p/keys [id] :as player} (generate ::d.p/player)
-        game (game/join-game (initialized-game) player)
-        leave-game-success? (fn [game player-id]
-                              (not ((::d.g/registered-players (game/leave-game game player-id)) player-id)))]
-    (is (leave-game-success? game id))
-    (is (not (leave-game-success? (game/end-registration game) id)))))
+(deftest join-game-late
+  (let [game (initialized-game)
+        players (mapv (fn [player username]
+                        (assoc player ::d.p/username username))
+                      (gen-players 3) ["Adam" "Mary" "Bob"])
+        {::d.p/keys [id] :as new-player} (first (gen-players 1))
+        game' (-> game
+                  (reg-players players)
+                  game/end-registration
+                  (game/join-game new-player))
+        new-player-with-index (assoc new-player ::d.p/index 3)]
+    (is (= new-player-with-index (get-in game' [::d.g/registered-players id])))
+    (is (= new-player-with-index (get-in game' [::d.g/players id])))))
+
+(deftest leave-game-late
+  (let [[{id1 ::d.p/id} {id2 ::d.p/id} {id3 ::d.p/id} :as players] (gen-players 3)
+        {::d.g/keys [registered-players players] :as game} (started-with-players players)
+        game' (-> game
+                  (game/nominate id1 id2)
+                  (game/vote id1 id2)
+                  (game/nominate id2 id3)
+                  (game/vote id2 id3)
+                  (game/leave-game id2))]
+    (is (not (contains? (::d.g/registered-players game') id2)))
+    (is (not (contains? (::d.g/players game') id2)))
+    (is (not (game/voted-for? game' id1 id2)))
+    (is (not (game/voted-for? game' id2 id3)))))
 
 (deftest end-registration
   (let [game (initialized-game)
@@ -70,40 +91,38 @@
         game-players (::d.g/registered-players game')
         index-of (fn [username] (get-in game-players [(username->id username) ::d.p/index]))]
     (is (= 0 (index-of "Adam")))
-    (is (= 1 (index-of "Bob")))
-    (is (= 2 (index-of "Mary")))))
+    (is (= 1 (index-of "Mary")))
+    (is (= 2 (index-of "Bob")))))
 
 (deftest start-day
   (let [game (initialized-game)]
-    (testing "Start day does nothing unless it's night or role distribution stage"
+    (testing "Start day does nothing unless it's night"
       (is (= game (game/start-day game)))
-      (let [day-game (-> game game/end-registration game/start-day)]
+      (let [role-distribution-game (-> game game/end-registration)
+            day-game (-> game game/end-registration game/start-night game/start-day)]
+        (is (= role-distribution-game (game/start-day role-distribution-game)))
         (is (= day-game (game/start-day day-game)))))
-    (testing "Start day adds current-day and changes stage to day when it's night or role distribution stage"
-      (let [rd-stage (-> game game/end-registration)
-            night-stage (-> game game/end-registration game/start-day game/end-day)
+    (testing "Start day adds current-day and changes stage to day when it's night"
+      (let [night-stage (-> game game/end-registration game/start-night)
             changes-to-day? (fn [game]
                               (is (not (::d.g/current-day game)))
                               (is (not= ::d.g/day (::d.g/stage game)))
                               (let [day-game (game/start-day game)]
                                 (is (::d.g/current-day day-game))
                                 (is (= ::d.g/day (::d.g/stage day-game)))))]
-        (changes-to-day? rd-stage)
         (changes-to-day? night-stage)))))
 
-(deftest end-day
+(deftest start-night
   (let [game (initialized-game)]
-    (testing "End day does nothing unless it's day stage"
-      (is (= game (game/end-day game)))
-      (let [rd-stage (-> game game/end-registration)
-            night-stage (-> game game/end-registration game/start-day game/end-day)]
-        (is (= rd-stage (game/end-day rd-stage)))
-        (is (= night-stage (game/end-day night-stage)))))
+    (testing "Start night does nothing unless it's day stage or role distribution stage"
+      (is (= game (game/start-night game)))
+      (let [night-stage (-> game game/end-registration game/start-night)]
+        (is (= night-stage (game/start-night night-stage)))))
     (testing "End day adds current-day to the end of past-days, removes current-day, and changes stage to night."
-      (let [day-stage (-> game game/end-registration game/start-day)]
+      (let [day-stage (-> game game/end-registration game/start-night game/start-day)]
         (is (::d.g/current-day day-stage))
         (is (= ::d.g/day (::d.g/stage day-stage)))
-        (let [night-stage (game/end-day day-stage)]
+        (let [night-stage (game/start-night day-stage)]
           (is (not (::d.g/current-day night-stage)))
           (is (= ::d.g/night (::d.g/stage night-stage)))
           (is (= (::d.g/current-day day-stage) (peek (::d.g/past-days night-stage)))))))))
@@ -170,13 +189,13 @@
         (is (game/nominated? game' id2))
         (is (not (game/can-nominate? game' id1)))
         (is (game/can-nominate? game' id3))))
-    (let [game' (game/end-day game)]
+    (let [game' (game/start-night game)]
       (is (= game' (game/nominate game' id1 id2))
           "You cannot nominate at night"))
     (testing "Nominations are cleared at day change"
       (let [game' (-> game
                       (game/nominate id1 id2)
-                      game/end-day
+                      game/start-night
                       game/start-day)]
         (is (not (game/nominated? game' id2)))
         (is (game/can-nominate? game' id1))))))
@@ -217,7 +236,7 @@
             (game/voted-for? id2 id1)
             not)
         "Cannot vote twice when dead")
-    (let [game' (game/end-day game)]
+    (let [game' (game/start-night game)]
       (is (= game' (game/vote game' id1 id2))
           "You cannot vote at night"))
     (testing "Your votes are invalidated if you are killed during the day"
@@ -239,7 +258,7 @@
     (is (-> game
             (game/nominate id1 id2)
             (game/vote id1 id2)
-            game/end-day
+            game/start-night
             game/start-day
             (game/voted-for? id1 id2)
             not)
@@ -290,7 +309,7 @@
                  (game/nominate id3 id1)
                  (game/vote id3 id1))
         day1-totals {id1 1 id2 1}
-        night-game (game/end-day game)
+        night-game (game/start-night game)
         day2-game (game/start-day night-game)]
     (is (= day1-totals (game/today-totals game))
         "Today votes counts same day votes")
@@ -319,7 +338,7 @@
                    (game/kill id2)
                    game/nonvoters))
         "Players whose votes have been invalidated are not counted as nonvoters")
-    (is (nil? (-> game game/end-day game/nonvoters))
+    (is (nil? (-> game game/start-night game/nonvoters))
         "Nonvoters is nil at night")))
 
 (deftest who-dies
@@ -342,6 +361,6 @@
         "No one dies when there is a tie, even when there is a majority of votes")
     (is (= id1 (-> game
                    (game/vote id2 id1)
-                   game/end-day
+                   game/start-night
                    game/who-dies))
         "who-dies returns who died yesterday if it's night")))

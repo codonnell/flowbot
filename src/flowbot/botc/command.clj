@@ -112,7 +112,7 @@
             :stage     #{::data.game/registration}
             :role      #{::data.game/moderator}
             :effect-fn (constantly {:event {::data.event/type ::data.event/end-registration}
-                                    :reply "Blood on the clocktower registration has been closed."})}))
+                                    :reply "Registration has closed, and roles are being distributed."})}))
 
 (def join-command
   (command {:cmd-name :join
@@ -133,19 +133,45 @@
                          {:event #::data.event {:type ::data.event/leave-game :player-id author-id}
                           :reply "You have left the game."})}))
 
+(def add-player-command
+  (command {:cmd-name :add-player
+            :role #{::data.game/moderator}
+            :mentions-role #{::data.game/not-player}
+            :effect-fn
+            (fn [{:keys [mention-id mentions]} _]
+              (let [added-username (-> mentions first :username)]
+                {:event #::data.event{:type ::data.event/join-game
+                                      :player-id mention-id
+                                      :username added-username}
+                 :reply (format "%s has been added to the game." added-username)}))}))
+
+(def remove-player-command
+  (command {:cmd-name :remove-player
+            :role #{::data.game/moderator}
+            :mentions-role #{::data.game/player}
+            :effect-fn
+            (fn [{:keys [mention-id mentions]} _]
+              (let [removed-username (-> mentions first :username)]
+                {:event #::data.event{:type ::data.event/leave-game
+                                      :player-id mention-id}
+                 :reply (format "%s has been removeed from the game." removed-username)}))}))
+
 (def start-day-command
   (command {:cmd-name :start-day
-            :stage #{::data.game/role-distribution ::data.game/night}
+            :stage #{::data.game/night}
             :role #{::data.game/moderator}
             :effect-fn (constantly {:event #::data.event{:type ::data.event/start-day}
                                     :reply "The sun crests the horizon as a new day begins."})}))
 
-(def end-day-command
-  (command {:cmd-name :end-day
-            :stage #{::data.game/day}
+(def start-night-command
+  (command {:cmd-name :start-night
+            :stage #{::data.game/role-distribution ::data.game/day}
             :role #{::data.game/moderator}
-            :effect-fn (constantly {:event #::data.event{:type ::data.event/end-day}
-                                    :reply "The sun disappears beyond the horizon as night begins."})}))
+            :effect-fn (fn [_ {::data.game/keys [current-day]}]
+                         {:event #::data.event{:type ::data.event/start-night}
+                          :reply (if current-day
+                                   "The sun disappears beyond the horizon as night begins."
+                                   "You feel a chill in your spine as the first night begins.")})}))
 
 (def nominate-command
   (command {:cmd-name :nominate
@@ -276,6 +302,16 @@
                                    (format "_%s_ will be executed."
                                            (format-votee registered-players dead-id))
                                    "No one will be executed.")})}))
+
+(def status-command
+  (command {:cmd-name :status
+            :effect-fn (fn [_ {::data.game/keys [stage past-days]}]
+                         {:reply
+                          (if-not (#{::data.game/day ::data.game/night} stage)
+                            (str "The stage is " (util/stringify-kw stage))
+                            (format "It is %s %d"
+                                    (util/stringify-kw stage)
+                                    (inc (count past-days))))})}))
 
 (defn comma-separated-player-list [registered-players ids]
   (x/str (comp (map #(get-in registered-players [% ::data.player/username] "moderator"))
@@ -414,9 +450,11 @@
                :end-game end-game-command
                :end-reg end-registration-command
                :start-day start-day-command
-               :end-day end-day-command
+               :start-night start-night-command
                :join join-command
                :leave leave-command
+               :add-player add-player-command
+               :remove-player remove-player-command
                :nominate nominate-command
                :vote vote-command
                :kill kill-command
@@ -426,6 +464,7 @@
                :vote-count vote-count-command
                :vote-log vote-log-command
                :who-dies who-dies-command
+               :status status-command
                :nonvoters nonvoters-command
                :ping-nonvoters ping-nonvoters-command
                :alive alive-command

@@ -50,7 +50,7 @@
            ::game/stage ::game/day)
     game))
 
-(defn end-day [{::game/keys [current-day] :as game}]
+(defn start-night [{::game/keys [current-day] :as game}]
   (if (day? game)
     (-> game
         (assoc ::game/stage ::game/night)
@@ -160,7 +160,8 @@
 ;; Events
 ;; [::vote {:voter voter :votee votee}]
 ;; [::start-day]
-;; [::end-day]
+;; [::start-night]
+;; [::end-day] -- JUST HERE FOR BACKWARD COMPATIBILITY
 ;; [::kill {:player-id player-id}]
 ;; [::revive {:player-id player-id}]
 ;; [::join-game {:player-id player-id}] -- consider a block feature
@@ -195,7 +196,11 @@
 
 (defmethod process-event* ::event/end-day
   [game _]
-  (end-day game))
+  (start-night game))
+
+(defmethod process-event* ::event/start-night
+  [game _]
+  (start-night game))
 
 (defmethod process-event* ::event/kill
   [game {::event/keys [player-id]}]

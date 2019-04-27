@@ -72,6 +72,9 @@
 (defmethod event-type ::end-day [_]
   (s/keys :req [::type]))
 
+(defmethod event-type ::start-night [_]
+  (s/keys :req [::type]))
+
 (defmethod event-type ::kill [_]
   (s/keys :req [::type ::player-id]))
 
