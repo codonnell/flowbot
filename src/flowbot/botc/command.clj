@@ -376,27 +376,8 @@
                                         "none"
                                         (comma-separated-ping-list (keys players))))})}))
 
-(def signups-command
-  (command {:cmd-name :signups
-            :stage #{::data.game/registration ::data.game/role-distribution}
-            :effect-fn (fn [_ {::data.game/keys [registered-players]}]
-                         {:reply (str "**Signups**: "
-                                      (if (empty? registered-players)
-                                        "none"
-                                        (comma-separated-player-list registered-players (keys registered-players))))})}))
-
-(def ping-signups-command
-  (command {:cmd-name :ping-signups
-            :stage #{::data.game/registration ::data.game/role-distribution}
-            :effect-fn (fn [_ {::data.game/keys [registered-players]}]
-                         {:reply (str "**Signups**: "
-                                      (if (empty? registered-players)
-                                        "none"
-                                        (comma-separated-ping-list (keys registered-players))))})}))
-
 (def players-command
   (command {:cmd-name :players
-            :stage #{::data.game/role-distribution ::data.game/day ::data.game/night ::data.game/finished}
             :allow-dm? true
             :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
                          (log/warn {:game game})
@@ -469,8 +450,6 @@
                :ping-nonvoters ping-nonvoters-command
                :alive alive-command
                :ping-alive ping-alive-command
-               :signups signups-command
-               :ping-signups ping-signups-command
                :players players-command
                :dm dm-command})
 
