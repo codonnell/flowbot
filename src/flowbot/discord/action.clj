@@ -9,19 +9,27 @@
 
 (defn send-messages!
   [rest-client & messages]
-  (log/warn {:messages messages})
   (doseq [{:keys [channel-id content]} messages]
-    (rest/create-message! rest-client channel-id content)))
+    (try (rest/create-message! rest-client channel-id content)
+         (catch Throwable e
+           (log/error "Error creating message" e)))))
 
 (defn send-dms!
   [rest-client & dms]
-  (log/warn {:dms dms})
   (doseq [{:keys [user-id content]} dms]
-    (rest/create-dm! rest-client user-id content)))
+    (try (rest/create-dm! rest-client user-id content)
+         (catch Throwable e
+           (log/error "Error creating dm" e)))))
 
 (def http-actions*
-  {::send-message rest/create-message!
-   ::send-dm rest/create-dm!
+  {::send-message (fn [& args]
+                    (try (apply rest/create-message! args)
+                         (catch Throwable e
+                           (log/error "Error creating message" e))))
+   ::send-dm (fn [& args]
+               (try (apply rest/create-dm! args)
+                    (catch Throwable e
+                      (log/error "Error creating dm" e))))
    ::send-messages send-messages!
    ::send-dms send-dms!})
 
