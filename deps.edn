@@ -3,7 +3,7 @@
  {org.clojure/clojure              {:mvn/version "1.10.0"}
   manifold                         {:mvn/version "0.1.6"}
   harmony                          {:git/url "git@github.com:codonnell/harmony.git"
-                                    :sha     "07d24f693641d7b0c4a8138b2cc80a0e779711cc"}
+                                    :sha     "fdec8a4ac9df2b86161517cd37123a20d2532e1f"}
   integrant                        {:mvn/version "0.7.0-alpha2"}
   com.walmartlabs/dyn-edn          {:mvn/version "0.2.0"}
   clojure.java-time                {:mvn/version "0.3.1"}
