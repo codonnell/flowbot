@@ -146,7 +146,7 @@
     (cond-> game
       will-nominate?
       (assoc-in [::game/current-day ::game/nominations nominated-id] nominator-id)
-      nominator-witched?
+      (and will-nominate? nominator-witched?)
       (kill nominator-id))))
 
 (defn voted-for? [game voter-id votee-id]
