@@ -135,7 +135,7 @@
 (defn is-nominator-witched?
   [{::game/keys [players] :as game} nominator-id]
   (and (true? (get-modifier game nominator-id ::witch))
-       #_(< 3 (count players))))
+       (< 3 (count players))))
 
 (defn nominate [{::game/keys [players] :as game} nominator-id nominated-id]
   (let [will-nominate? (and (alive? game nominator-id)
