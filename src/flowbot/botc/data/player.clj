@@ -10,5 +10,6 @@
 (s/def ::id (s/with-gen pos-int? #(gen/fmap (fn [_] (swap! cur-player-id inc)) (gen/return nil))))
 (s/def ::username (s/with-gen ::util/nonblank-string #(s/gen names)))
 (s/def ::index pos-int?)
+(s/def ::modifiers map?)
 (s/def ::player (s/keys :req [::id ::username]
-                        :opt [::index]))
+                        :opt [::index ::modifiers]))

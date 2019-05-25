@@ -354,6 +354,12 @@
                    (game/vote id2 id1)
                    game/who-dies))
         "A single player with a majority of votes dies")
+    (is (= id3 (-> (started-with-players players)
+                   (game/kill id1)
+                   (game/nominate id2 id3)
+                   (game/vote id2 id3)
+                   game/who-dies))
+        "A player with exactly half the votes of living players dies")
     (is (nil? (-> game
                   (game/vote id2 id1)
                   (game/vote id3 id2)

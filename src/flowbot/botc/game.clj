@@ -61,6 +61,27 @@
     (not= ::game/registration stage) (update ::game/players dissoc player-id)
     true (invalidate-votes-for-and-by-player player-id)))
 
+(def daily-modifiers
+  #{::witch})
+
+(defn get-modifier [game player-id modifier-key]
+  (get-in game [::game/registered-players player-id ::player/modifiers modifier-key]))
+
+(defn assoc-modifier [game player-id modifier-key modifier-val]
+  (cond-> game
+    (contains? (::game/registered-players game) player-id)
+    (assoc-in [::game/registered-players player-id ::player/modifiers modifier-key] modifier-val)))
+
+(defn dissoc-modifier [game player-id modifier-key]
+  (cond-> game
+    (contains? (::game/registered-players game) player-id)
+    (update-in [::game/registered-players player-id ::player/modifiers] dissoc modifier-key)))
+
+(defn update-modifier [game player-id modifier-key update-fn]
+  (cond-> game
+    (contains? (::game/registered-players game) player-id)
+    (update-in [::game/registered-players player-id ::player/modifiers modifier-key] update-fn)))
+
 (defn start-day [{::game/keys [past-days stage] :as game}]
   (if (night? game)
     (assoc game
@@ -68,12 +89,26 @@
            ::game/stage ::game/day)
     game))
 
+(defn- remove-modifiers [game modifier-pred]
+  (update game ::game/registered-players
+          (fn [players]
+            (into {}
+                  (map (fn [[player-id player]]
+                         [player-id (update player ::player/modifiers
+                                            (fn [modifier-map]
+                                              (into {}
+                                                    (remove (fn [[k v]]
+                                                              (modifier-pred k)))
+                                                    modifier-map)))])
+                       players)))))
+
 (defn start-night [{::game/keys [current-day stage] :as game}]
   (if (#{::game/role-distribution ::game/day} stage)
     (cond-> game
       true (assoc ::game/stage ::game/night)
       current-day (update ::game/past-days conj current-day)
-      true (dissoc ::game/current-day))
+      true (dissoc ::game/current-day)
+      true (remove-modifiers daily-modifiers))
     game))
 
 (defn- moderator? [{::game/keys [moderator-id]} id]
@@ -95,13 +130,24 @@
   (and (or (player? game id) (moderator? game id))
        (not (nominated? game id))))
 
+(declare kill)
+
+(defn is-nominator-witched?
+  [{::game/keys [players] :as game} nominator-id]
+  (and (true? (get-modifier game nominator-id ::witch))
+       #_(< 3 (count players))))
+
 (defn nominate [{::game/keys [players] :as game} nominator-id nominated-id]
-  (cond-> game
-    (and (alive? game nominator-id)
-         (day? game)
-         (can-nominate? game nominator-id)
-         (can-be-nominated? game nominated-id))
-    (assoc-in [::game/current-day ::game/nominations nominated-id] nominator-id)))
+  (let [will-nominate? (and (alive? game nominator-id)
+                            (day? game)
+                            (can-nominate? game nominator-id)
+                            (can-be-nominated? game nominated-id))
+        nominator-witched? (is-nominator-witched? game nominator-id)]
+    (cond-> game
+      will-nominate?
+      (assoc-in [::game/current-day ::game/nominations nominated-id] nominator-id)
+      nominator-witched?
+      (kill nominator-id))))
 
 (defn voted-for? [game voter-id votee-id]
   (some #(= #::game{:voter-id voter-id :votee-id votee-id} %)
@@ -161,7 +207,7 @@
                                              (when (= n max-votes)
                                                id)))
                                      votes)]
-    (when (and (> max-votes (quot (count players) 2))
+    (when (and (>= max-votes (/ (count players) 2))
                (= 1 (count players-with-max-votes)))
       (first players-with-max-votes))))
 
@@ -208,6 +254,14 @@
 (defmethod process-event* ::event/leave-game
   [game {::event/keys [player-id]}]
   (leave-game game player-id))
+
+(defmethod process-event* ::event/witch
+  [game {::event/keys [player-id]}]
+  (assoc-modifier game player-id ::witch true))
+
+(defmethod process-event* ::event/unwitch
+  [game {::event/keys [player-id]}]
+  (dissoc-modifier game player-id ::witch))
 
 (defmethod process-event* ::event/nominate
   [game {::event/keys [nominator-id nominated-id]}]

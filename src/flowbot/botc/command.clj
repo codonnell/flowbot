@@ -24,6 +24,9 @@
 (defn mention-id [message]
   (some-> message :mentions first :id util/parse-long))
 
+(defn ping [id]
+  (format "<@%d>" id))
+
 (def start-game-command
   {:name :start-game
    :interceptors [discord.action/reply-interceptor ::pg/inject-conn botc.int/no-game-running]
@@ -173,6 +176,42 @@
                                    "The sun disappears beyond the horizon as night begins."
                                    "You feel a chill in your spine as the first night begins.")})}))
 
+(defn- get-recipient [game msg]
+  (let [[_ recipient-index] (str/split msg #"\s+")]
+    (try (and recipient-index
+              (some (fn [[_ {::data.player/keys [index] :as player}]]
+                      (when (= (util/parse-long recipient-index) index)
+                        player))
+                    (::data.game/registered-players game)))
+         (catch Throwable _ nil))))
+
+(def witch-command
+  (command {:cmd-name :witch
+            :allow-dm? true
+            :stage #{::data.game/night}
+            :role #{::data.game/moderator}
+            :effect-fn (fn [{:keys [content]} game]
+                         (let [{::data.player/keys [id username] :as recipient} (get-recipient game content)]
+                           (if-not (nil? recipient)
+                             {:event #::data.event{:type ::data.event/witch
+                                                   :player-id id}
+                              :reply (format "_%s_ has been witched" username)}
+                             {:reply "Usage: !witch [player-index]"})))}))
+
+(def unwitch-command
+  (command {:cmd-name :unwitch
+            :allow-dm? true
+            :stage #{::data.game/night}
+            :role #{::data.game/moderator}
+            :effect-fn (fn [{:keys [content]} game]
+                         (let [{::data.player/keys [id username] :as recipient} (get-recipient game content)]
+                           (if-not (nil? recipient)
+                             {:event #::data.event{:type ::data.event/unwitch
+                                                   :player-id id}
+                              :reply (format "_%s_ has been unwitched" username)}
+                             {:reply "Usage: !unwitch [player-index]"})))}))
+
+
 (def nominate-command
   (command {:cmd-name :nominate
             :stage #{::data.game/day}
@@ -185,10 +224,12 @@
                            (not (game/can-be-nominated? game mention-id))
                            {:reply "That player has already been nominated today"}
                            :else
-                           {:event #::data.event{:type ::data.event/nominate
-                                                 :nominator-id author-id
-                                                 :nominated-id mention-id}
-                            :reply "Your nomination has been registered."}))}))
+                           (cond-> {:event #::data.event{:type ::data.event/nominate
+                                                         :nominator-id author-id
+                                                         :nominated-id mention-id}
+                                    :reply "Your nomination has been registered."}
+                             (game/is-nominator-witched? game author-id)
+                             (update :reply str "\n" (ping author-id) " has been killed."))))}))
 
 (def vote-command
   (command {:cmd-name :vote
@@ -394,13 +435,13 @@
                   ::pg/inject-conn
                   botc.int/dm-inject-channel-id
                   botc.int/current-game-lens
-                  (botc.int/role #{::data.game/player})
-                  (botc.int/stage #{::data.game/day})]
+                  (botc.int/role #{::data.game/player ::data.game/moderator})
+                  (botc.int/stage #{::data.game/day ::data.game/registration})]
    :handler-fn
    {:name ::dm-handler
     :leave (fn [{::game/keys [game] :keys [event] :as ctx}]
              (let [[_ recipient-index message] (str/split (:content event) #"\s+" 3)
-                   author-username (get-in game [::data.game/registered-players (author-id event) ::data.player/username])]
+                   author-username (get-in game [::data.game/registered-players (author-id event) ::data.player/username] "Storyteller")]
                (update ctx :effects merge
                        (if-let [recipient (try (and recipient-index
                                                     message
@@ -426,7 +467,6 @@
                                                                        message)}]}
                          {::discord.action/reply {:content "Usage: !dm player-number message\nType !players in the game channel to see all player numbers."}}))))}})
 
-
 (def commands {:start-game start-game-command
                :end-game end-game-command
                :end-reg end-registration-command
@@ -451,7 +491,9 @@
                :alive alive-command
                :ping-alive ping-alive-command
                :players players-command
-               :dm dm-command})
+               :dm dm-command
+               :witch witch-command
+               :unwitch unwitch-command})
 
 (def botc-commands-command
   {:name :botc-commands
