@@ -39,7 +39,7 @@
 
 (defn join-game [{::game/keys [stage registered-players] :as game} {::player/keys [id] :as player}]
   (let [past-registration? (not= ::game/registration stage)
-        new-player (assoc player ::player/index (inc (transduce (map ::player/index)
+        new-player (assoc player ::player/index (inc (transduce (map (comp ::player/index val))
                                                                 max -1
                                                                 registered-players)))]
     (cond-> game
