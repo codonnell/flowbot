@@ -39,7 +39,9 @@
 
 (defn join-game [{::game/keys [stage registered-players] :as game} {::player/keys [id] :as player}]
   (let [past-registration? (not= ::game/registration stage)
-        new-player (assoc player ::player/index (count registered-players))]
+        new-player (assoc player ::player/index (inc (transduce (map ::player/index)
+                                                                max -1
+                                                                registered-players)))]
     (cond-> game
       true (update ::game/registered-players assoc id new-player)
       past-registration? (update ::game/players assoc id new-player))))
