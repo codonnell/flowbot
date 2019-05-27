@@ -282,26 +282,26 @@
             :role #{::data.game/moderator}
             :mentions-role #{::data.game/alive}
             :effect-fn (fn [{:keys [mention-id]} {::data.game/keys [registered-players] :as game}]
-                         {:reply (if (game/is-fool-active? game mention-id)
-                                   (str (format-votee registered-players mention-id)
-                                        " did not die."))
-                          :event #::data.event{:type ::data.event/kill
-                                               :player-id mention-id}})}))
+                         {:event #::data.event{:type ::data.event/kill
+                                               :player-id mention-id}
+                          :reply (str (format-votee registered-players mention-id)
+                                      " has met an unforunate demise.")})}))
 
 (def execute-command
   (command {:cmd-name :execute
             :stage #{::data.game/day}
             :role #{::data.game/moderator}
             :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
-                         (let [dead-id (game/who-dies game)
-                               reply (if (and dead-id (not (game/is-fool-active? game dead-id)))
-                                       (str (format-votee registered-players dead-id)
-                                            " has been executed.")
-                                       "No one has been executed")]
-                           (cond-> {:reply reply}
-                             dead-id
-                             (assoc :event #::data.event{:type ::data.event/kill
-                                                         :player-id dead-id}))))}))
+                         (let [dead-id (game/who-dies game)]
+                           (if (and dead-id (not (game/is-fool-active? game dead-id)))
+                             {:event #::data.event{:type ::data.event/kill
+                                                   :player-id dead-id}
+                              :reply (str (format-votee registered-players dead-id)
+                                          " has been executed.")}
+                             (cond-> {:reply "No one has been executed"}
+                               (and dead-id (game/is-fool-active? game dead-id))
+                               (assoc :event #::data.event{:type ::data.event/unfool
+                                                           :player-id dead-id})))))}))
 
 (def revive-command
   (command {:cmd-name :revive

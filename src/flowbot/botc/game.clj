@@ -146,16 +146,22 @@
   (and (true? (get-modifier game nominator-id ::witch))
        (< 3 (count players))))
 
+(defn is-fool-active? [game player-id]
+  (get-modifier game player-id ::fool))
+
 (defn nominate [{::game/keys [players] :as game} nominator-id nominated-id]
   (let [will-nominate? (and (alive? game nominator-id)
                             (day? game)
                             (can-nominate? game nominator-id)
                             (can-be-nominated? game nominated-id))
-        nominator-witched? (is-nominator-witched? game nominator-id)]
+        nominator-witched? (is-nominator-witched? game nominator-id)
+        nominator-fool? (is-fool-active? game nominator-id)]
     (cond-> game
       will-nominate?
       (assoc-in [::game/current-day ::game/nominations nominated-id] nominator-id)
-      (and will-nominate? nominator-witched?)
+      (and will-nominate? nominator-witched? nominator-fool?)
+      (dissoc-modifier nominator-id ::fool)
+      (and will-nominate? nominator-witched? (not nominator-fool?))
       (kill nominator-id))))
 
 (defn voted-for? [game voter-id votee-id]
@@ -226,15 +232,10 @@
   (when (day? game)
     (set/difference (set (keys players)) (into #{} (map ::game/voter-id) votes))))
 
-(defn is-fool-active? [game player-id]
-  (get-modifier game player-id ::fool))
-
 (defn kill [game player-id]
-  (if (is-fool-active? game player-id)
-    (dissoc-modifier game player-id ::fool)
-    (-> game
-        (update ::game/players dissoc player-id)
-        (invalidate-votes-for-and-by-player player-id))))
+  (-> game
+      (update ::game/players dissoc player-id)
+      (invalidate-votes-for-and-by-player player-id)))
 
 (defn revive [{::game/keys [registered-players] :as game} player-id]
   (cond-> game
