@@ -37,11 +37,18 @@
 (defn- registration-open? [{:keys [::game/stage]}]
   (= ::game/registration stage))
 
+(defn- next-index [registered-players]
+  (->> registered-players
+       count
+       inc
+       range
+       (map inc)
+       (remove (into #{} (map (comp ::player/index val)) registered-players))
+       first))
+
 (defn join-game [{::game/keys [stage registered-players] :as game} {::player/keys [id] :as player}]
   (let [past-registration? (not= ::game/registration stage)
-        new-player (assoc player ::player/index (inc (transduce (map (comp ::player/index val))
-                                                                max -1
-                                                                registered-players)))]
+        new-player (assoc player ::player/index (next-index registered-players))]
     (cond-> game
       true (update ::game/registered-players assoc id new-player)
       past-registration? (update ::game/players assoc id new-player))))
@@ -219,10 +226,15 @@
   (when (day? game)
     (set/difference (set (keys players)) (into #{} (map ::game/voter-id) votes))))
 
+(defn is-fool-active? [game player-id]
+  (get-modifier game player-id ::fool))
+
 (defn kill [game player-id]
-  (-> game
-      (update ::game/players dissoc player-id)
-      (invalidate-votes-for-and-by-player player-id)))
+  (if (is-fool-active? game player-id)
+    (dissoc-modifier game player-id ::fool)
+    (-> game
+        (update ::game/players dissoc player-id)
+        (invalidate-votes-for-and-by-player player-id))))
 
 (defn revive [{::game/keys [registered-players] :as game} player-id]
   (cond-> game
@@ -256,6 +268,14 @@
 (defmethod process-event* ::event/leave-game
   [game {::event/keys [player-id]}]
   (leave-game game player-id))
+
+(defmethod process-event* ::event/fool
+  [game {::event/keys [player-id]}]
+  (assoc-modifier game player-id ::fool true))
+
+(defmethod process-event* ::event/unfool
+  [game {::event/keys [player-id]}]
+  (dissoc-modifier game player-id ::fool))
 
 (defmethod process-event* ::event/witch
   [game {::event/keys [player-id]}]

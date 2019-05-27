@@ -185,6 +185,30 @@
                     (::data.game/registered-players game)))
          (catch Throwable _ nil))))
 
+(def fool-command
+  (command {:cmd-name :fool
+            :allow-dm? true
+            :role #{::data.game/moderator}
+            :effect-fn (fn [{:keys [content]} game]
+                         (let [{::data.player/keys [id username] :as recipient} (get-recipient game content)]
+                           (if-not (nil? recipient)
+                             {:event #::data.event{:type ::data.event/fool
+                                                   :player-id id}
+                              :reply (format "_%s_ will not die the first time" username)}
+                             {:reply "Usage: !fool [player-index]"})))}))
+
+(def unfool-command
+  (command {:cmd-name :unfool
+            :allow-dm? true
+            :role #{::data.game/moderator}
+            :effect-fn (fn [{:keys [content]} game]
+                         (let [{::data.player/keys [id username] :as recipient} (get-recipient game content)]
+                           (if-not (nil? recipient)
+                             {:event #::data.event{:type ::data.event/unfool
+                                                   :player-id id}
+                              :reply (format "_%s_ will not die the first time" username)}
+                             {:reply "Usage: !unfool [player-index]"})))}))
+
 (def witch-command
   (command {:cmd-name :witch
             :allow-dm? true
@@ -228,7 +252,8 @@
                                                          :nominator-id author-id
                                                          :nominated-id mention-id}
                                     :reply "Your nomination has been registered."}
-                             (game/is-nominator-witched? game author-id)
+                             (and (game/is-nominator-witched? game author-id)
+                                  (not (game/is-fool-active? game author-id)))
                              (update :reply str "\n" (ping author-id) " has been killed."))))}))
 
 (def vote-command
@@ -426,7 +451,10 @@
                                       (if (seq registered-players)
                                         (x/str (map (fn [[_ {::data.player/keys [index username]}]]
                                                       (format "\n%d. %s" index username)))
-                                               (sort-by (comp ::data.player/index val) registered-players))
+                                               (into [[(::data.game/moderator-id game)
+                                                       {::data.player/index 0
+                                                        ::data.player/username "Storyteller"}]]
+                                                     (sort-by (comp ::data.player/index val) registered-players)))
                                         ": none"))})}))
 
 (def dm-command
@@ -445,10 +473,13 @@
                (update ctx :effects merge
                        (if-let [recipient (try (and recipient-index
                                                     message
-                                                    (some (fn [[_ {::data.player/keys [index] :as player}]]
-                                                            (when (= (util/parse-long recipient-index) index)
-                                                              player))
-                                                          (::data.game/registered-players game)))
+                                                    (or (and (= "0" recipient-index)
+                                                             {::data.player/username "Storyteller"
+                                                              ::data.player/id (::data.game/moderator-id game)})
+                                                        (some (fn [[_ {::data.player/keys [index] :as player}]]
+                                                                (when (= (util/parse-long recipient-index) index)
+                                                                  player))
+                                                              (::data.game/registered-players game))))
                                                (catch Throwable _ nil))]
                          {::discord.action/reply {:content (format "Message sent to %s"
                                                                    (::data.player/username recipient))}
@@ -493,7 +524,9 @@
                :players players-command
                :dm dm-command
                :witch witch-command
-               :unwitch unwitch-command})
+               :unwitch unwitch-command
+               :fool fool-command
+               :unfool unfool-command})
 
 (def botc-commands-command
   {:name :botc-commands
