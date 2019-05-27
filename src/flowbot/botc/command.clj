@@ -206,7 +206,7 @@
                            (if-not (nil? recipient)
                              {:event #::data.event{:type ::data.event/unfool
                                                    :player-id id}
-                              :reply (format "_%s_ will not die the first time" username)}
+                              :reply (format "_%s_ will die the first time again" username)}
                              {:reply "Usage: !unfool [player-index]"})))}))
 
 (def witch-command
@@ -282,26 +282,26 @@
             :role #{::data.game/moderator}
             :mentions-role #{::data.game/alive}
             :effect-fn (fn [{:keys [mention-id]} {::data.game/keys [registered-players] :as game}]
-                         (if (game/is-fool-active? game mention-ied)
-                           {:reply (str (format-votee registered-players mention-id)
-                                        " did not die.")}
-                           {:event #::data.event{:type ::data.event/kill
-                                                 :player-id mention-id}
-                            :reply (str (format-votee registered-players mention-id)
-                                        " has met an unforunate demise.")}))}))
+                         {:reply (if (game/is-fool-active? game mention-id)
+                                   (str (format-votee registered-players mention-id)
+                                        " did not die."))
+                          :event #::data.event{:type ::data.event/kill
+                                               :player-id mention-id}})}))
 
 (def execute-command
   (command {:cmd-name :execute
             :stage #{::data.game/day}
             :role #{::data.game/moderator}
             :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
-                         (let [dead-id (game/who-dies game)]
-                           (if (and dead-id (not (game/is-fool-active? game dead-id)))
-                             {:event #::data.event{:type ::data.event/kill
-                                                   :player-id dead-id}
-                              :reply (str (format-votee registered-players dead-id)
-                                          " has been executed.")}
-                             {:reply "No one has been executed"})))}))
+                         (let [dead-id (game/who-dies game)
+                               reply (if (and dead-id (not (game/is-fool-active? game dead-id)))
+                                       (str (format-votee registered-players dead-id)
+                                            " has been executed.")
+                                       "No one has been executed")]
+                           (cond-> {:reply reply}
+                             dead-id
+                             (assoc :event #::data.event{:type ::data.event/kill
+                                                         :player-id dead-id}))))}))
 
 (def revive-command
   (command {:cmd-name :revive
