@@ -15,6 +15,9 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]))
 
+(defn- bold [s]
+  (str "**" s "**"))
+
 (defn author-id [message]
   (util/parse-long (get-in message [:author :id])))
 
@@ -108,6 +111,42 @@
             (send-message [(channel-id event) (if pin-channel-id
                                                 (format "Pin channel has been set to <#%d>" pin-channel-id)
                                                 "Pin channel has been unset")]))
+          (catch Throwable e
+            (log/error e))))})
+
+(def pin-command
+  {:name :pin
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  botc.int/current-game-lens
+                  (botc.int/role #{::data.game/moderator ::data.game/player})]
+   :handler-fn
+   (int.reg/interceptor
+    {:name ::pin-handler
+     :leave (fn [{{::data.game/keys [channel-id pin-channel-id registered-players]} ::game/game
+                  :keys [event] :as ctx}]
+              (update ctx :effects assoc
+                      ::pin
+                      {::data.game/channel-id channel-id
+                       ::data.game/pin-channel-id pin-channel-id
+                       :content (let [pin-message (-> event
+                                                      :content
+                                                      (str/split #"\s+" 2)
+                                                      second)]
+                                  (str (bold "Pinned by: ")
+                                       (get-in registered-players
+                                               [(author-id event) ::data.player/username]
+                                               "moderator")
+                                       "\n"
+                                       pin-message))}))})})
+
+(def pin-effect
+  {:name ::pin
+   :f (fn [{::data.game/keys [channel-id pin-channel-id] :keys [content]}]
+        (try
+          (let [send-message (:f (reg/get :effect ::discord.action/send-message))]
+            (send-message [pin-channel-id content])
+            (send-message [channel-id "Message pinned."]))
           (catch Throwable e
             (log/error e))))})
 
@@ -350,9 +389,6 @@
                           :reply (str (get-in registered-players [mention-id ::data.player/username])
                                       " has been brought back to life. Hooray!")})}))
 
-(defn- bold [s]
-  (str "**" s "**"))
-
 (defn format-vote-count [num-players [target n]]
   (cond-> (str target ": " n)
     (> n (quot num-players 2)) bold))
@@ -541,6 +577,7 @@
 (def commands {:start-game start-game-command
                :end-game end-game-command
                :set-pin-channel set-pin-channel-command
+               :pin pin-command
                :end-reg end-registration-command
                :start-day start-day-command
                :start-night start-night-command
@@ -586,7 +623,8 @@
 
 (def registry {:effect {::start-game start-game-effect
                         ::end-game end-game-effect
-                        ::set-pin-channel set-pin-channel-effect}
+                        ::set-pin-channel set-pin-channel-effect
+                        ::pin pin-effect}
                :command (assoc commands :botc-commands botc-commands-command)})
 
 (defmethod plugin/enable "botc" [_]
