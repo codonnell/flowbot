@@ -24,6 +24,9 @@
 (defn mention-id [message]
   (some-> message :mentions first :id util/parse-long))
 
+(defn channel-mentions [message]
+  (->> message :content (re-seq #"<#(\d+)>") (mapv #(some-> % second util/parse-long))))
+
 (defn ping [id]
   (format "<@%d>" id))
 
@@ -75,6 +78,39 @@
             (send-message [channel-id "The blood on the clocktower game has finished."]))
           (catch Throwable e
             (log/error e))))})
+
+(def set-pin-channel-command
+  {:name :set-pin-channel
+   :interceptors [discord.action/reply-interceptor
+                  ::pg/inject-conn
+                  botc.int/current-game-lens
+                  (int.reg/or-auth
+                   discord.action/owner-role
+                   (botc.int/role #{::data.game/moderator}))]
+   :handler-fn
+   (int.reg/interceptor
+    {:name ::set-pin-channel-handler
+     :leave (fn [{::game/keys [game] ::pg/keys [conn] :keys [event] :as ctx}]
+              (let [pin-channel-id (first (channel-mentions event))]
+                (update ctx :effects assoc
+                        ::set-pin-channel
+                        {::data.game/id (::data.game/id game)
+                         ::data.game/pin-channel-id pin-channel-id
+                         :event event
+                         ::pg/conn conn})))})})
+
+(def set-pin-channel-effect
+  {:name ::set-pin-channel
+   :f (fn [{::data.game/keys [id pin-channel-id] ::pg/keys [conn] :keys [event]}]
+        (try
+          (let [send-message (:f (reg/get :effect ::discord.action/send-message))]
+            (data.game/set-pin-channel! conn {:id id :pin-channel-id pin-channel-id})
+            (send-message [(channel-id event) (if pin-channel-id
+                                                (format "Pin channel has been set to <#%d>" pin-channel-id)
+                                                "Pin channel has been unset")]))
+          (catch Throwable e
+            (log/error e))))})
+
 
 ;; Most of these are just boilerplate around:
 ;; * command name
@@ -504,6 +540,7 @@
 
 (def commands {:start-game start-game-command
                :end-game end-game-command
+               :set-pin-channel set-pin-channel-command
                :end-reg end-registration-command
                :start-day start-day-command
                :start-night start-night-command
@@ -548,7 +585,8 @@
                               (keys commands))}))})})
 
 (def registry {:effect {::start-game start-game-effect
-                        ::end-game end-game-effect}
+                        ::end-game end-game-effect
+                        ::set-pin-channel set-pin-channel-effect}
                :command (assoc commands :botc-commands botc-commands-command)})
 
 (defmethod plugin/enable "botc" [_]

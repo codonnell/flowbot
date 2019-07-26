@@ -12,6 +12,7 @@
   (get-botc-game-by-id [this id])
   (get-unfinished-botc-game-by-channel-id [this channel-id])
   (get-unfinished-botc-games [this])
+  (set-pin-channel! [this game])
   (finish-botc-game-by-id! [this id]))
 
 (hugsql/def-db-fns "flowbot/botc/data/game.sql" {:quoting :ansi})
@@ -27,6 +28,7 @@
                                                             {:to-db (fn [id] {:channel-id id})})
      :get-unfinished-botc-games (pg/wrap-query #'get-unfinished-botc-games*
                                                q-ns)
+     :set-pin-channel! (pg/wrap-query #'set-pin-channel!* q-ns)
      :finish-botc-game-by-id! (pg/wrap-query #'finish-botc-game-by-id!*
                                              q-ns
                                              {:to-db (fn [id] {:id id})})}))
@@ -60,29 +62,35 @@
 (s/def ::stage #{::registration ::role-distribution ::day ::night ::finished})
 (s/def ::moderator-id ::player/id)
 (s/def ::channel-id pos-int?)
+(s/def ::pin-channel-id pos-int?)
 (s/def ::id uuid?)
 (s/def ::created-at inst?)
 (s/def ::finished-at inst?)
 
 (s/def ::db-game (s/keys :req [::channel-id ::moderator-id ::id ::created-at]
-                         :opt [::finished-at]))
+                         :opt [::finished-at ::pin-channel-id]))
 
 (defmulti game-stage ::stage)
 
 (defmethod game-stage ::registration [_]
-  (s/keys :req [::stage ::registered-players ::channel-id ::moderator-id ::id ::created-at]))
+  (s/keys :req [::stage ::registered-players ::channel-id ::moderator-id ::id ::created-at]
+          :opt [::pin-channel-id]))
 
 (defmethod game-stage ::role-distribution [_]
-  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::dead-votes-used]))
+  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::dead-votes-used]
+          :opt [::pin-channel-id]))
 
 (defmethod game-stage ::day [_]
-  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::current-day ::past-days ::dead-votes-used]))
+  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::current-day ::past-days ::dead-votes-used]
+          :opt [::pin-channel-id]))
 
 (defmethod game-stage ::night [_]
-  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::past-days ::dead-votes-used]))
+  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::past-days ::dead-votes-used]
+          :opt [::pin-channel-id]))
 
 (defmethod game-stage ::finished [_]
-  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::past-days ::finished-at ::dead-votes-used]))
+  (s/keys :req [::stage ::registered-players ::players ::channel-id ::moderator-id ::id ::created-at ::past-days ::finished-at ::dead-votes-used]
+          :opt [::pin-channel-id]))
 
 (s/def ::game (s/multi-spec game-stage ::stage))
 
