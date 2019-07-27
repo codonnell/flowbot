@@ -233,7 +233,7 @@
               (let [removed-username (-> mentions first :username)]
                 {:event #::data.event{:type ::data.event/leave-game
                                       :player-id mention-id}
-                 :reply (format "%s has been removeed from the game." removed-username)}))}))
+                 :reply (format "%s has been removed from the game." removed-username)}))}))
 
 (def start-day-command
   (command {:cmd-name :start-day
@@ -491,7 +491,7 @@
 (def ping-nonvoters-command
   (command {:cmd-name :ping-nonvoters
             :stage #{::data.game/day}
-            :role #{::data.game/player ::data.game/moderator}
+            :role #{::data.game/moderator}
             :effect-fn (fn [_ {::data.game/keys [registered-players] :as game}]
                          {:reply (let [nonvoter-ids (game/nonvoters game)]
                                    (str "**Nonvoters**: "
@@ -512,7 +512,7 @@
 (def ping-alive-command
   (command {:cmd-name :ping-alive
             :stage #{::data.game/day ::data.game/night}
-            :role #{::data.game/player ::data.game/moderator}
+            :role #{::data.game/moderator}
             :effect-fn (fn [_ {::data.game/keys [players]}]
                          {:reply (str "**Alive Players**: "
                                       (if (empty? players)
