@@ -86,6 +86,7 @@
   {:name :set-pin-channel
    :interceptors [discord.action/reply-interceptor
                   ::pg/inject-conn
+                  botc.int/dm-inject-channel-id
                   botc.int/current-game-lens
                   (int.reg/or-auth
                    discord.action/owner-role
