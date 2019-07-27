@@ -13,7 +13,9 @@
             [net.cgrand.xforms :as x]
             [integrant.core :as ig]
             [clojure.string :as str]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log])
+  (:import [java.time ZonedDateTime ZoneId Duration]
+           [java.time.temporal ChronoUnit]))
 
 (defn- bold [s]
   (str "**" s "**"))
@@ -575,6 +577,31 @@
                                                                        message)}]}
                          {::discord.action/reply {:content "Usage: !dm player-number message\nType !players in the game channel to see all player numbers."}}))))}})
 
+
+(defn- next-day []
+  (.plusDays (.truncatedTo (ZonedDateTime/now (ZoneId/of "UTC")) ChronoUnit/DAYS) 1))
+
+(defn- time-remaining []
+  (Duration/between (ZonedDateTime/now (ZoneId/of "UTC")) (next-day)))
+
+(defn- time-remaining-string []
+  (let [remaining (time-remaining)
+        hours (.toHours remaining)
+        minutes (rem (.toMinutes remaining) 60)
+        seconds (rem (.toSeconds remaining) 60)]
+    (str (cond (zero? hours) nil
+               (= 1 hours) "1 hour, "
+               :else (str hours " hours, "))
+         (cond (zero? minutes) nil
+               (= 1 minutes) "1 minute, "
+               :else (str minutes " minutes, "))
+         (if (= 1 seconds) "1 second" (str seconds " seconds")))))
+
+(def time-remaining-command
+  (command {:cmd-name :time-remaining
+            :effect-fn (fn [_ _]
+                         {:reply (str (time-remaining-string) " remaining")})}))
+
 (def commands {:start-game start-game-command
                :end-game end-game-command
                :set-pin-channel set-pin-channel-command
@@ -605,7 +632,8 @@
                :witch witch-command
                :unwitch unwitch-command
                :fool fool-command
-               :unfool unfool-command})
+               :unfool unfool-command
+               :time-remaining time-remaining-command})
 
 (def botc-commands-command
   {:name :botc-commands
